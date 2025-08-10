@@ -6,12 +6,15 @@ import 'package:spotter/src/screens/post_detail_screen.dart';
 class FeedCard extends StatefulWidget {
   final Map<String, dynamic> item;
   final VoidCallback onDelete;
+  // --- 형님의 요청대로 수정된 부분 ---
+  final Function(String caption, List<String> tags)? onUpdate;
   final Function(List<Map<String, dynamic>>) onCommentsUpdated;
 
   const FeedCard({
     super.key,
     required this.item,
     required this.onDelete,
+    this.onUpdate, // onUpdate는 선택적으로 받도록 변경
     required this.onCommentsUpdated,
   });
 
@@ -22,6 +25,9 @@ class FeedCard extends StatefulWidget {
 class _FeedCardState extends State<FeedCard> {
   late bool _isLiked;
   late int _likeCount;
+  // --- 형님의 요청대로 추가된 부분 ---
+  final TextEditingController _captionEditController = TextEditingController();
+  final TextEditingController _tagsEditController = TextEditingController();
 
   @override
   void initState() {
@@ -29,6 +35,14 @@ class _FeedCardState extends State<FeedCard> {
     _isLiked = false;
     _likeCount = widget.item['likes'] ?? 0;
   }
+
+  @override
+  void dispose() {
+    _captionEditController.dispose();
+    _tagsEditController.dispose();
+    super.dispose();
+  }
+  // --- 여기까지 추가/수정되었습니다 ---
 
   void _toggleLike() {
     setState(() {
@@ -73,6 +87,14 @@ class _FeedCardState extends State<FeedCard> {
                   title: const Text('수정하기'),
                   onTap: () {
                     Navigator.pop(context);
+                    // --- 형님의 요청대로 수정된 부분 ---
+                    if (widget.onUpdate != null) {
+                      _showEditPostDialog();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('이 피드는 수정할 수 없습니다.')),
+                      );
+                    }
                   },
                 ),
                 ListTile(
@@ -109,6 +131,73 @@ class _FeedCardState extends State<FeedCard> {
     );
   }
 
+  // --- 형님의 요청대로 추가된 부분 ---
+  // 게시물 수정 다이얼로그
+  void _showEditPostDialog() {
+    // 현재 게시물의 내용을 컨트롤러에 설정합니다.
+    _captionEditController.text = (widget.item['caption'] ?? '').toString();
+    final currentTags = List<String>.from(widget.item['tags'] ?? []);
+    // '#' 기호를 제거하고 쉼표로 연결하여 보여줍니다.
+    _tagsEditController.text = currentTags.map((t) => t.startsWith('#') ? t.substring(1) : t).join(', ');
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('게시물 수정'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _captionEditController,
+                  decoration: const InputDecoration(
+                    labelText: '내용',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 5,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _tagsEditController,
+                  decoration: const InputDecoration(
+                    labelText: '태그 (쉼표로 구분)',
+                    hintText: '예: 맛집, 수다, 질문',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('취소'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+            FilledButton(
+              child: const Text('저장'),
+              onPressed: () {
+                final newCaption = _captionEditController.text.trim();
+                // 입력된 태그를 쉼표 기준으로 나누고, 공백 제거, # 추가
+                final newTags = _tagsEditController.text
+                    .split(',')
+                    .map((e) => '#${e.trim()}')
+                    .where((e) => e.length > 1)
+                    .toList();
+
+                // onUpdate 콜백이 있으면 실행
+                widget.onUpdate?.call(newCaption, newTags);
+
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+  // --- 여기까지 추가되었습니다 ---
+
   void _showDeleteConfirmDialog() {
     showDialog(
       context: context,
@@ -140,8 +229,6 @@ class _FeedCardState extends State<FeedCard> {
         (widget.item['commentsList'] as List? ?? []).length;
     bool isMyPost = widget.item['userName'] == '형님';
 
-    // --- 형님의 요청대로 수정된 부분 ---
-    // Firestore에서 오는 List<dynamic>을 List<String>으로 안전하게 변환합니다.
     final tags = List<String>.from(widget.item['tags'] ?? []);
 
     return Card(

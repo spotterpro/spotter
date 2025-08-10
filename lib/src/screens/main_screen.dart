@@ -30,7 +30,9 @@ class _MainScreenState extends State<MainScreen> {
     _allFeedItems = [
       {'id': 'cert_1', 'userName': '스포터', 'userImageSeed': 'user1', 'storeName': '클린한 세탁소 · 3일 전', 'postImageSeed': 'laundry_feed', 'caption': '세탁 맡겼던 운동화 찾는 날. 새것처럼 깨끗해져서 기분 최고! ✨', 'tags': ['#세탁'], 'likes': 78, 'isCertified': true, 'commentsList': []},
       {'id': 'cert_2', 'userName': '형님', 'userImageSeed': 'myprofile', 'storeName': '맛집 파스타 · 1일 전', 'postImageSeed': 'pasta_feed_my', 'caption': '오늘 저녁은 파스타로 정했다. 다들 맛저!', 'tags': ['#파스타맛집'], 'likes': 99, 'isCertified': true, 'commentsList': []},
-      {'id': 'comm_1', 'userName': '형님', 'userImageSeed': 'myprofile', 'storeName': '어제', 'postImageSeed': null, 'caption': '주말에 다들 뭐하시나요? 날씨도 좋은데 좋은 계획 있으시면 공유해주세요!', 'tags': ['#일상', '#수다'], 'likes': 34, 'isCertified': false, 'commentsList': [], 'levelTitle': 'LV.25', 'time': '어제', 'isHot': false},
+      // --- 형님의 요청대로 수정된 부분 ---
+      // CommunityScreen이 Firestore를 직접 사용하므로 로컬 목 데이터는 제거합니다.
+      // {'id': 'comm_1', 'userName': '형님', 'userImageSeed': 'myprofile', 'storeName': '어제', 'postImageSeed': null, 'caption': '주말에 다들 뭐하시나요? 날씨도 좋은데 좋은 계획 있으시면 공유해주세요!', 'tags': ['#일상', '#수다'], 'likes': 34, 'isCertified': false, 'commentsList': [], 'levelTitle': 'LV.25', 'time': '어제', 'isHot': false},
     ];
   }
 
@@ -73,7 +75,8 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final homeFeeds = _allFeedItems.where((i) => i['isCertified'] == true).toList();
-    final communityFeeds = _allFeedItems.where((i) => i['isCertified'] == false).toList();
+    // CommunityScreen이 직접 Firestore 데이터를 사용하므로 이 변수는 더 이상 필요 없습니다.
+    // final communityFeeds = _allFeedItems.where((i) => i['isCertified'] == false).toList();
     final myCertifiedFeeds = _allFeedItems.where((i) => i['userName'] == '형님' && i['isCertified'] == true).toList();
     final myCommunityFeeds = _allFeedItems.where((i) => i['userName'] == '형님' && i['isCertified'] == false).toList();
 
@@ -83,11 +86,9 @@ class _MainScreenState extends State<MainScreen> {
         onDelete: _deleteFeedItem,
         onCommentsUpdated: _updateComments,
       ),
-      CommunityScreen(
-        feedItems: communityFeeds,
-        onDelete: _deleteFeedItem,
-        onCommentsUpdated: _updateComments,
-      ),
+      // --- 형님의 요청대로 수정된 부분 ---
+      // CommunityScreen을 파라미터 없이 호출합니다.
+      const CommunityScreen(),
       const UploadFeedScreen(),
       const StampScreen(),
       MyPageScreen(
@@ -100,6 +101,7 @@ class _MainScreenState extends State<MainScreen> {
         onPostUpdated: _updatePost,
       ),
     ];
+    // --- 여기까지 수정되었습니다 ---
 
     return Scaffold(
       body: IndexedStack(
