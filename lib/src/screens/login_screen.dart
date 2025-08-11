@@ -1,10 +1,8 @@
+// 📁 lib/src/screens/login_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_signin_button/flutter_signin_button.dart';
-// ↓↓↓↓↓↓↓↓↓↓ 이 한 줄의 오타를 바로 잡았습니다, 형님! ↓↓↓↓↓↓↓↓↓↓
-import 'package:firebase_auth/firebase_auth.dart';
-// ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:spotter/src/screens/home_screen.dart';
+import 'package:spotter/services/auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -15,40 +13,23 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isSigningIn = false;
+  final AuthService _authService = AuthService();
 
   Future<void> _signInWithGoogle() async {
-    setState(() {
-      _isSigningIn = true;
-    });
+    setState(() { _isSigningIn = true; });
 
     try {
-      final GoogleSignIn googleSignIn = GoogleSignIn();
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-
-      if (googleUser == null) {
-        if (mounted) {
-          setState(() {
-            _isSigningIn = false;
-          });
-        }
-        return;
-      }
-
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final OAuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      await FirebaseAuth.instance.signInWithCredential(credential);
-
+      await _authService.signInWithGoogle();
+      // 로그인 성공 후 화면 전환은 main.dart의 StreamBuilder가 자동으로 처리합니다.
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isSigningIn = false;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('로그인 중 문제가 발생했습니다: ${e.toString()}')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() { _isSigningIn = false; });
       }
     }
   }
@@ -61,11 +42,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final titleStyle = const TextStyle(
-        fontSize: 36, fontWeight: FontWeight.bold, color: Colors.orange);
+    final titleStyle = const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.orange);
     final subtitleStyle = TextStyle(fontSize: 14, color: Colors.grey[700]);
-    final disclaimerStyle =
-    TextStyle(fontSize: 12, color: Colors.grey[500], height: 1.4);
+    final disclaimerStyle = TextStyle(fontSize: 12, color: Colors.grey[500], height: 1.4);
 
     return Scaffold(
       body: SafeArea(
@@ -76,21 +55,14 @@ class _LoginScreenState extends State<LoginScreen> {
               const Spacer(flex: 3),
               Text('Spotter', style: titleStyle),
               const SizedBox(height: 8),
-              Text(
-                '내 동네의 재발견, 스포터와 함께',
-                style: subtitleStyle,
-                textAlign: TextAlign.center,
-              ),
+              Text('내 동네의 재발견, 스포터와 함께', style: subtitleStyle, textAlign: TextAlign.center),
               const Spacer(flex: 4),
               SizedBox(
                 width: double.infinity,
                 height: 48,
                 child: GestureDetector(
                   onTap: () => _onKakaoPressed(context),
-                  child: Image.asset(
-                    'assets/images/kakao_signin_button.png',
-                    fit: BoxFit.cover,
-                  ),
+                  child: Image.asset('assets/images/kakao_signin_button.png', fit: BoxFit.cover),
                 ),
               ),
               const SizedBox(height: 12),
@@ -105,9 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     text: 'Sign in with Google',
                     onPressed: _signInWithGoogle,
                     padding: const EdgeInsets.symmetric(vertical: 0),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               const Spacer(flex: 5),

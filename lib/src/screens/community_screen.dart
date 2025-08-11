@@ -19,7 +19,71 @@ class CommunityScreen extends StatefulWidget {
 
 class _CommunityScreenState extends State<CommunityScreen> {
   int _selectedTagIndex = 0;
-  final List<String> _tags = ['#전체', '🔥 주간 인기글', '#맛집탐방', '#일상', '#궁금해요'];
+  List<String> _tags = ['#전체', '🔥 주간 인기글'];
+  bool _isLoadingTags = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTrendingTags();
+  }
+
+  Future<void> _fetchTrendingTags() async {
+    setState(() { _isLoadingTags = true; });
+    try {
+      final postsSnapshot = await FirebaseFirestore.instance
+          .collection('posts')
+          .where('isCertified', isEqualTo: false)
+          .orderBy('time', descending: true)
+          .limit(100)
+          .get();
+
+      final tagCounts = <String, int>{};
+
+      for (var doc in postsSnapshot.docs) {
+        final tags = List<String>.from(doc.data()['tags'] ?? []);
+        for (var tag in tags) {
+          tagCounts[tag] = (tagCounts[tag] ?? 0) + 1;
+        }
+      }
+
+      final sortedTags = tagCounts.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+
+      final top3Tags = sortedTags.take(3).map((e) => e.key).toList();
+
+      setState(() {
+        _tags = ['#전체', '🔥 주간 인기글', ...top3Tags];
+      });
+    } catch (e) {
+      print("트렌드 태그 로딩 실패: $e");
+    } finally {
+      setState(() { _isLoadingTags = false; });
+    }
+  }
+
+  Query _buildQuery() {
+    Query query = FirebaseFirestore.instance
+        .collection('posts')
+        .where('isCertified', isEqualTo: false);
+
+    if (_selectedTagIndex == 0) {
+      return query.orderBy('time', descending: true);
+    }
+    else if (_selectedTagIndex == 1) {
+      final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
+      return query
+          .where('time', isGreaterThanOrEqualTo: Timestamp.fromDate(sevenDaysAgo))
+          .orderBy('time', descending: true)
+          .orderBy('likeCount', descending: true);
+    }
+    else {
+      final selectedTag = _tags[_selectedTagIndex];
+      return query
+          .where('tags', arrayContains: selectedTag)
+          .orderBy('time', descending: true);
+    }
+  }
 
   Future<void> _deletePost(String postId) async {
     try {
@@ -58,7 +122,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -75,7 +138,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
             padding: const EdgeInsets.only(bottom: 8.0),
             child: SizedBox(
               height: 40,
-              child: ListView.builder(
+              child: _isLoadingTags
+                  ? const Center(child: LinearProgressIndicator())
+                  : ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: _tags.length,
@@ -108,28 +173,19 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('posts').where('isCertified', isEqualTo: false).orderBy('time', descending: true).snapshots(),
+              stream: _buildQuery().snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('오류가 발생했습니다. 파이어베이스 색인을 확인해주세요.\n${snapshot.error}'));
                 }
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                   return const Center(child: Text('아직 게시물이 없습니다.'));
                 }
 
                 var docs = snapshot.data!.docs;
-
-                if (_selectedTagIndex > 0) {
-                  final selectedTag = _tags[_selectedTagIndex];
-                  docs = docs.where((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    final tags = List<String>.from(data['tags'] ?? []);
-                    if (_selectedTagIndex == 1) {
-                      return data['isHot'] == true;
-                    }
-                    return tags.contains(selectedTag);
-                  }).toList();
-                }
 
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(vertical: 8),

@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:spotter/services/firestore_service.dart';
 
 class CreateCommunityPostScreen extends StatefulWidget {
   final Map<String, dynamic> currentUser;
@@ -23,6 +24,7 @@ class _CreateCommunityPostScreenState extends State<CreateCommunityPostScreen> {
 
   bool _isCreatingPoll = false;
   final List<TextEditingController> _pollOptionControllers = [];
+  final FirestoreService _firestoreService = FirestoreService();
 
   @override
   void initState() {
@@ -83,6 +85,7 @@ class _CreateCommunityPostScreenState extends State<CreateCommunityPostScreen> {
         'tags': tags,
         'isCertified': false,
         'isHot': false,
+        'likeCount': 0, // likeCount 필드를 0으로 초기화
       };
 
       if (_isCreatingPoll) {
@@ -103,6 +106,8 @@ class _CreateCommunityPostScreenState extends State<CreateCommunityPostScreen> {
       }
 
       await FirebaseFirestore.instance.collection('posts').add(postData);
+
+      await _firestoreService.incrementUserXp(user.uid, 10);
 
       if (mounted) Navigator.of(context).pop();
 

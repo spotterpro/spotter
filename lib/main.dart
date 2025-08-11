@@ -1,7 +1,11 @@
+// 📁 lib/main.dart
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spotter/firebase_options.dart';
+import 'package:spotter/models/user_model.dart';
 import 'package:spotter/src/screens/main_screen.dart';
 import 'package:spotter/src/screens/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -56,20 +60,44 @@ class MyApp extends StatelessWidget {
               ),
             ),
             themeMode: currentMode,
-            home: StreamBuilder(
+            home: StreamBuilder<User?>(
               stream: FirebaseAuth.instance.authStateChanges(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Scaffold(body: Center(child: CircularProgressIndicator()));
                 }
                 if (snapshot.hasData) {
-                  return const MainScreen();
+                  return AuthWrapper(user: snapshot.data!);
                 }
                 return const LoginScreen();
               },
             ),
           );
         }
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  final User user;
+  const AuthWrapper({super.key, required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const LoginScreen();
+        }
+
+        final userProfile = UserProfile.fromDocument(snapshot.data!);
+
+        return MainScreen(currentUserProfile: userProfile);
+      },
     );
   }
 }

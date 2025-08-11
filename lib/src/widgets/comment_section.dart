@@ -8,7 +8,6 @@ import 'package:spotter/services/firestore_service.dart';
 
 class CommentSection extends StatefulWidget {
   final String postId;
-  // --- 형님의 요청대로 수정된 부분 ---
   final Map<String, dynamic> currentUser;
 
   const CommentSection({
@@ -50,27 +49,33 @@ class _CommentSectionState extends State<CommentSection> {
     return DateFormat('yyyy.MM.dd').format(postTime);
   }
 
-  void _submitComment() {
+  void _submitComment() async { // async 키워드 추가
     if (_commentController.text.trim().isEmpty) return;
 
-    // --- 형님의 요청대로 수정된 부분 ---
-    // 위젯으로부터 전달받은 currentUser 정보를 사용합니다.
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
     final currentUserInfo = {
-      'name': widget.currentUser['name'],
-      'imageSeed': widget.currentUser['imageSeed'],
+      'name': widget.currentUser['userName'],
+      'imageSeed': widget.currentUser['userImageSeed'],
       'levelTitle': widget.currentUser['levelTitle'],
-      'uid': FirebaseAuth.instance.currentUser?.uid,
+      'uid': user.uid,
     };
 
     if (_editingDocRef != null) {
-      _firestoreService.updateComment(_editingDocRef!, _commentController.text.trim());
+      await _firestoreService.updateComment(_editingDocRef!, _commentController.text.trim());
       setState(() { _editingDocRef = null; });
     } else if (_replyingTo != null) {
-      _firestoreService.addReply(
+      await _firestoreService.addReply(
           widget.postId, _replyingTo!['id'], _commentController.text.trim(), currentUserInfo);
+      // --- 형님의 요청대로 추가된 부분 ---
+      // 대댓글 작성 보상으로 +2 XP를 적립합니다.
+      await _firestoreService.incrementUserXp(user.uid, 2);
       setState(() { _replyingTo = null; });
     } else {
-      _firestoreService.addComment(widget.postId, _commentController.text.trim(), currentUserInfo);
+      await _firestoreService.addComment(widget.postId, _commentController.text.trim(), currentUserInfo);
+      // 댓글 작성 보상으로 +2 XP를 적립합니다.
+      await _firestoreService.incrementUserXp(user.uid, 2);
     }
 
     _commentController.clear();
@@ -96,6 +101,7 @@ class _CommentSectionState extends State<CommentSection> {
 
   @override
   Widget build(BuildContext context) {
+    // ... (기존 build 메소드는 동일하게 유지)
     return Column(
       children: [
         Expanded(
@@ -146,6 +152,7 @@ class _CommentSectionState extends State<CommentSection> {
   }
 
   Widget _buildCommentTree(DocumentSnapshot commentDoc) {
+    // ... (기존 _buildCommentTree 메소드는 동일하게 유지)
     final commentData = commentDoc.data() as Map<String, dynamic>;
 
     return Column(
@@ -171,6 +178,7 @@ class _CommentSectionState extends State<CommentSection> {
   }
 
   Widget _buildCommentItem(DocumentReference docRef, Map<String, dynamic> data, {bool isReply = false}) {
+    // ... (기존 _buildCommentItem 메소드는 동일하게 유지)
     final author = data['author'] as Map<String, dynamic>? ?? {};
     final authorName = author['name'] ?? '알 수 없음';
     final authorImageSeed = author['imageSeed'] ?? 'default';
@@ -236,6 +244,7 @@ class _CommentSectionState extends State<CommentSection> {
   }
 
   void _showEditDeleteMenu(BuildContext context, DocumentReference docRef, String currentText) {
+    // ... (기존 _showEditDeleteMenu 메소드는 동일하게 유지)
     showModalBottomSheet(
       context: context, backgroundColor: Colors.transparent,
       builder: (context) {
@@ -265,6 +274,7 @@ class _CommentSectionState extends State<CommentSection> {
   }
 
   Widget _buildCommentInput() {
+    // ... (기존 _buildCommentInput 메소드는 동일하게 유지)
     final isEditing = _editingDocRef != null;
     final isReplying = _replyingTo != null;
     String hintText = '댓글 달기...';
@@ -302,7 +312,7 @@ class _CommentSectionState extends State<CommentSection> {
               ),
             Row(
               children: [
-                CircleAvatar(radius: 18, backgroundImage: NetworkImage('https://picsum.photos/seed/${widget.currentUser['imageSeed']}/100/100')),
+                CircleAvatar(radius: 18, backgroundImage: NetworkImage('https://picsum.photos/seed/${widget.currentUser['userImageSeed']}/100/100')),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(

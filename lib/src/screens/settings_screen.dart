@@ -1,3 +1,5 @@
+// 📁 lib/src/screens/settings_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotter/main.dart';
@@ -24,6 +26,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = true;
   bool _isDarkMode = false;
+  final AuthService _authService = AuthService();
 
   @override
   void initState() {
@@ -115,11 +118,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             title: const Text('로그아웃', style: TextStyle(color: Colors.red)),
             onTap: () {
-              signOutWithGoogle().then((_) {
-                if (mounted) {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                }
-              });
+              _authService.signOut();
+              // 화면 전환은 main.dart의 StreamBuilder가 자동으로 처리합니다.
             },
             tileColor: Theme.of(context).cardColor,
             shape: RoundedRectangleBorder(

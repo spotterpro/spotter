@@ -207,6 +207,13 @@ class _FeedCardState extends State<FeedCard> {
     );
   }
 
+  void _navigateToUserProfile(String userId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => UserProfileScreen(userId: userId)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final author = widget.item['author'] is Map<String, dynamic>
@@ -216,6 +223,7 @@ class _FeedCardState extends State<FeedCard> {
     final authorName = author['name'] ?? '알 수 없음';
     final authorImageSeed = author['imageSeed'] ?? 'default';
     final authorLevel = author['levelTitle'] ?? 'LV.1';
+    final authorUid = author['uid'] as String?;
 
     final tags = List<String>.from(widget.item['tags'] ?? []);
     final pollData = widget.item['poll'] as Map<String, dynamic>?;
@@ -235,14 +243,22 @@ class _FeedCardState extends State<FeedCard> {
             child: Row(
               children: [
                 GestureDetector(
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const UserProfileScreen())),
+                  onTap: () {
+                    if (authorUid != null) {
+                      _navigateToUserProfile(authorUid);
+                    }
+                  },
                   child: CircleAvatar(
                       backgroundImage: NetworkImage('https://picsum.photos/seed/$authorImageSeed/100/100')),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const UserProfileScreen())),
+                    onTap: () {
+                      if (authorUid != null) {
+                        _navigateToUserProfile(authorUid);
+                      }
+                    },
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

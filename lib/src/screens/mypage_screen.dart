@@ -3,16 +3,21 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:spotter/models/user_model.dart';
+import 'package:spotter/src/screens/crew_studio_screen.dart';
+import 'package:spotter/src/screens/my_growth_log_screen.dart';
 import 'package:spotter/src/screens/settings_screen.dart';
+import 'package:spotter/src/screens/user_profile_screen.dart';
 import 'package:spotter/src/widgets/feed_card.dart';
 
 class MyPageScreen extends StatefulWidget {
-  final Map<String, dynamic> currentUser;
+  final UserProfile currentUserProfile;
   final Function(Map<String, String>) onProfileUpdated;
 
   const MyPageScreen({
     super.key,
-    required this.currentUser,
+    required this.currentUserProfile,
     required this.onProfileUpdated,
   });
 
@@ -76,43 +81,64 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
-          return <Widget>[
-            SliverToBoxAdapter(child: _buildProfileHeader(context)),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _TabBarDelegate(
-                TabBar(
-                  controller: _tabController,
-                  isScrollable: false,
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  indicator: UnderlineTabIndicator(
-                    borderSide: BorderSide(width: 3, color: primary),
+    return StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(_currentUserId).snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final userProfile = UserProfile.fromDocument(snapshot.data!);
+
+          return Scaffold(
+            body: NestedScrollView(
+              headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+                return <Widget>[
+                  SliverToBoxAdapter(
+                    child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => UserProfileScreen(userId: userProfile.uid)),
+                          );
+                        },
+                        child: _buildProfileHeader(context, userProfile)
+                    ),
                   ),
-                  labelStyle: const TextStyle(fontWeight: FontWeight.w700),
-                  tabs: const [
-                    Tab(text: '인증 피드'),
-                    Tab(text: '작성한 글'),
-                  ],
-                ),
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _TabBarDelegate(
+                      TabBar(
+                        controller: _tabController,
+                        isScrollable: false,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        indicator: UnderlineTabIndicator(
+                          borderSide: BorderSide(width: 3, color: primary),
+                        ),
+                        labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+                        tabs: const [
+                          Tab(text: '인증 피드'),
+                          Tab(text: '작성한 글'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ];
+              },
+              body: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildCertifiedFeed(),
+                  _buildWrittenPosts(userProfile),
+                ],
               ),
             ),
-          ];
-        },
-        body: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildCertifiedFeed(),
-            _buildWrittenPosts(),
-          ],
-        ),
-      ),
+          );
+        }
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context) {
+  Widget _buildProfileHeader(BuildContext context, UserProfile userProfile) {
     return Container(
       color: Theme.of(context).cardColor,
       padding: const EdgeInsets.all(16.0).copyWith(top: 50, bottom: 24),
@@ -124,7 +150,7 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
               CircleAvatar(
                 radius: 40,
                 backgroundImage: NetworkImage(
-                  'https://picsum.photos/seed/${widget.currentUser['userImageSeed']}/200/200',
+                  'https://picsum.photos/seed/${userProfile.userImageSeed}/200/200',
                 ),
               ),
               const SizedBox(width: 16),
@@ -132,12 +158,13 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.currentUser['userName'],
+                    Text(userProfile.userName,
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    // --- 형님의 요청대로 수정된 부분 ---
-                    Text(widget.currentUser['levelTitle'], // "LV.25" 만 표시됨
-                        style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                    Text(
+                      '${userProfile.levelTitle} 동네 탐험가',
+                      style: const TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
                   ],
                 ),
               ),
@@ -147,7 +174,7 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
                     context,
                     MaterialPageRoute(
                       builder: (context) => SettingsScreen(
-                        currentUser: widget.currentUser,
+                        currentUser: userProfile.toMap(),
                         onProfileUpdated: widget.onProfileUpdated,
                       ),
                     ),
@@ -157,15 +184,66 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          if (widget.currentUser['bio'] != null && widget.currentUser['bio'].isNotEmpty)
+          if (userProfile.bio.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              padding: const EdgeInsets.only(top: 16.0),
               child: Text(
-                widget.currentUser['bio'],
+                userProfile.bio,
                 style: const TextStyle(fontSize: 15, height: 1.4),
               ),
             ),
+          const SizedBox(height: 24),
+          // --- 형님의 요청대로 수정된 부분 ---
+          GestureDetector(
+            onTap: () {
+              // MyGrowthLogScreen으로 실시간 userProfile 객체를 전달합니다.
+              Navigator.push(context, MaterialPageRoute(builder: (context) => MyGrowthLogScreen(userProfile: userProfile)));
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('XP: ${userProfile.xp}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text('다음 레벨까지 ${userProfile.nextLevelXp - userProfile.xp} XP', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                LinearProgressIndicator(
+                  value: userProfile.levelProgress,
+                  backgroundColor: Theme.of(context).dividerColor,
+                  color: Colors.orange,
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _ProfileStat(count: '${userProfile.crewCount}', label: '크루원'),
+              _ProfileStat(count: '${userProfile.myCrewCount}', label: '나의 크루'),
+              _ProfileStat(count: '${userProfile.influence}', label: '영향력'),
+            ],
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => CrewStudioScreen(userProfile: userProfile)));
+            },
+            icon: const FaIcon(FontAwesomeIcons.users, size: 16),
+            label: const Text('크루 스튜디오'),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
+              backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200],
+              foregroundColor: Theme.of(context).textTheme.bodyLarge?.color,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          )
         ],
       ),
     );
@@ -197,15 +275,13 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
             final data = docs[index].data() as Map<String, dynamic>;
             final itemWithId = {...data, 'id': docs[index].id};
             return InkWell(
-              onTap: () {
-                // TODO: 인증피드 상세 화면으로 이동
-              },
+              onTap: () {},
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(
+                child: itemWithId['postImageSeed'] != null ? Image.network(
                   'https://picsum.photos/seed/${itemWithId['postImageSeed']}/300/300',
                   fit: BoxFit.cover,
-                ),
+                ) : Container(color: Colors.grey[300], child: const Icon(Icons.image_not_supported)),
               ),
             );
           },
@@ -214,7 +290,7 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildWrittenPosts() {
+  Widget _buildWrittenPosts(UserProfile userProfile) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('posts')
@@ -235,7 +311,7 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
-            final itemWithId = {...data, 'id': docs[index].id};
+            final itemWithId = { ...data, 'id': docs[index].id };
             return FeedCard(
               key: ValueKey(itemWithId['id']),
               item: itemWithId,
@@ -245,6 +321,22 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
           },
         );
       },
+    );
+  }
+}
+
+class _ProfileStat extends StatelessWidget {
+  final String count;
+  final String label;
+  const _ProfileStat({required this.count, required this.label});
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(count, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+      ],
     );
   }
 }
