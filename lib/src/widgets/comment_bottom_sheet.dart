@@ -1,20 +1,22 @@
+// 📁 lib/src/widgets/comment_bottom_sheet.dart
+
 import 'package:flutter/material.dart';
 import 'package:spotter/src/widgets/comment_section.dart';
 
 class CommentBottomSheet extends StatelessWidget {
-  final List<Map<String, dynamic>> initialComments;
-  final Function(List<Map<String, dynamic>>) onCommentsUpdated;
+  final String postId;
+  // --- 형님의 요청대로 수정된 부분 ---
+  // 현재 사용자 정보를 받기 위한 파라미터 추가
+  final Map<String, dynamic> currentUser;
 
   const CommentBottomSheet({
     super.key,
-    required this.initialComments,
-    required this.onCommentsUpdated,
+    required this.postId,
+    required this.currentUser,
   });
 
   @override
   Widget build(BuildContext context) {
-    // --- 형님의 요청대로 수정된 부분 ---
-    // 키보드가 올라올 때 화면이 가려지지 않도록 Padding을 추가합니다.
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
@@ -31,8 +33,10 @@ class CommentBottomSheet extends StatelessWidget {
             ),
             Expanded(
               child: CommentSection(
-                initialComments: initialComments,
-                onCommentsUpdated: onCommentsUpdated,
+                postId: postId,
+                // --- 형님의 요청대로 수정된 부분 ---
+                // CommentSection으로 현재 사용자 정보 전달
+                currentUser: currentUser,
               ),
             ),
           ],

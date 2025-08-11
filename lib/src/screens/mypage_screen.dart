@@ -1,30 +1,19 @@
+// 📁 lib/src/screens/mypage_screen.dart
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:spotter/src/screens/crew_studio_screen.dart';
-import 'package:spotter/src/screens/edit_profile_screen.dart';
-import 'package:spotter/src/screens/my_growth_log_screen.dart';
-import 'package:spotter/src/screens/post_detail_screen.dart';
 import 'package:spotter/src/screens/settings_screen.dart';
 import 'package:spotter/src/widgets/feed_card.dart';
 
 class MyPageScreen extends StatefulWidget {
   final Map<String, dynamic> currentUser;
-  final List<Map<String, dynamic>> certifiedFeeds;
-  final List<Map<String, dynamic>> communityFeeds;
-  final Function(String) onDelete;
-  final Function(String, List<Map<String, dynamic>>) onCommentsUpdated;
   final Function(Map<String, String>) onProfileUpdated;
-  final Function(String, String) onPostUpdated;
 
   const MyPageScreen({
     super.key,
     required this.currentUser,
-    required this.certifiedFeeds,
-    required this.communityFeeds,
-    required this.onDelete,
-    required this.onCommentsUpdated,
     required this.onProfileUpdated,
-    required this.onPostUpdated,
   });
 
   @override
@@ -33,6 +22,7 @@ class MyPageScreen extends StatefulWidget {
 
 class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMixin {
   late final TabController _tabController;
+  final String _currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   void initState() {
@@ -44,6 +34,43 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _deletePost(String postId) async {
+    try {
+      await FirebaseFirestore.instance.collection('posts').doc(postId).delete();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('게시물이 삭제되었습니다.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('삭제 중 오류가 발생했습니다: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _updatePost(String postId, String newCaption, List<String> newTags) async {
+    try {
+      await FirebaseFirestore.instance.collection('posts').doc(postId).update({
+        'caption': newCaption,
+        'tags': newTags,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('게시물이 수정되었습니다.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('수정 중 오류가 발생했습니다: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   @override
@@ -59,16 +86,13 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
               delegate: _TabBarDelegate(
                 TabBar(
                   controller: _tabController,
-                  // ✅ 반반 정확히: 탭이 화면을 균등 분할
                   isScrollable: false,
-                  // ✅ 인디케이터가 탭 전체 폭(=화면의 1/2)로 표시
                   indicatorSize: TabBarIndicatorSize.tab,
                   indicator: UnderlineTabIndicator(
                     borderSide: BorderSide(width: 3, color: primary),
                   ),
                   labelStyle: const TextStyle(fontWeight: FontWeight.w700),
                   tabs: const [
-                    // ✅ 숫자 제거
                     Tab(text: '인증 피드'),
                     Tab(text: '작성한 글'),
                   ],
@@ -111,7 +135,8 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
                     Text(widget.currentUser['userName'],
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text(widget.currentUser['levelTitle'],
+                    // --- 형님의 요청대로 수정된 부분 ---
+                    Text(widget.currentUser['levelTitle'], // "LV.25" 만 표시됨
                         style: const TextStyle(color: Colors.grey, fontSize: 14)),
                   ],
                 ),
@@ -147,33 +172,43 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
   }
 
   Widget _buildCertifiedFeed() {
-    return GridView.builder(
-      padding: const EdgeInsets.all(8),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8,
-      ),
-      itemCount: widget.certifiedFeeds.length,
-      itemBuilder: (context, index) {
-        final item = widget.certifiedFeeds[index];
-        return InkWell(
-          onTap: () async {
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => PostDetailScreen(item: item)),
-            );
-            if (result == 'deleted') {
-              widget.onDelete(item['id']);
-            } else if (result is Map) {
-              widget.onPostUpdated(item['id'], result['caption']);
-            }
-          },
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              'https://picsum.photos/seed/${item['postImageSeed']}/300/300',
-              fit: BoxFit.cover,
-            ),
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('posts')
+          .where('author.uid', isEqualTo: _currentUserId)
+          .where('isCertified', isEqualTo: true)
+          .orderBy('time', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text('작성한 인증 피드가 없습니다.'));
+        }
+        final docs = snapshot.data!.docs;
+        return GridView.builder(
+          padding: const EdgeInsets.all(8),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8,
           ),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final itemWithId = {...data, 'id': docs[index].id};
+            return InkWell(
+              onTap: () {
+                // TODO: 인증피드 상세 화면으로 이동
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  'https://picsum.photos/seed/${itemWithId['postImageSeed']}/300/300',
+                  fit: BoxFit.cover,
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -183,7 +218,7 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('posts')
-          .where('userName', isEqualTo: widget.currentUser['userName'])
+          .where('author.uid', isEqualTo: _currentUserId)
           .where('isCertified', isEqualTo: false)
           .orderBy('time', descending: true)
           .snapshots(),
@@ -204,9 +239,8 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
             return FeedCard(
               key: ValueKey(itemWithId['id']),
               item: itemWithId,
-              onDelete: () => widget.onDelete(itemWithId['id']),
-              onCommentsUpdated: (newComments) =>
-                  widget.onCommentsUpdated(itemWithId['id'], newComments),
+              onDelete: () => _deletePost(itemWithId['id']),
+              onUpdate: (caption, tags) => _updatePost(itemWithId['id'], caption, tags),
             );
           },
         );

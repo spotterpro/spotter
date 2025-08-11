@@ -1,9 +1,16 @@
+// 📁 lib/src/screens/create_community_post_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class CreateCommunityPostScreen extends StatefulWidget {
-  const CreateCommunityPostScreen({super.key});
+  final Map<String, dynamic> currentUser;
+
+  const CreateCommunityPostScreen({
+    super.key,
+    required this.currentUser,
+  });
 
   @override
   State<CreateCommunityPostScreen> createState() => _CreateCommunityPostScreenState();
@@ -14,8 +21,42 @@ class _CreateCommunityPostScreenState extends State<CreateCommunityPostScreen> {
   final TextEditingController _tagsController = TextEditingController();
   bool _isLoading = false;
 
+  bool _isCreatingPoll = false;
+  final List<TextEditingController> _pollOptionControllers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _pollOptionControllers.add(TextEditingController());
+    _pollOptionControllers.add(TextEditingController());
+  }
+
+  @override
+  void dispose() {
+    _captionController.dispose();
+    _tagsController.dispose();
+    for (var controller in _pollOptionControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _addPollOption() {
+    setState(() {
+      _pollOptionControllers.add(TextEditingController());
+    });
+  }
+
+  void _removePollOption(int index) {
+    setState(() {
+      _pollOptionControllers[index].dispose();
+      _pollOptionControllers.removeAt(index);
+    });
+  }
+
   Future<void> _sharePost() async {
-    if (_captionController.text.trim().isEmpty) {
+    final caption = _captionController.text.trim();
+    if (caption.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('내용을 입력해주세요.'), backgroundColor: Colors.red),
       );
@@ -26,44 +67,56 @@ class _CreateCommunityPostScreenState extends State<CreateCommunityPostScreen> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-      // 쉼표로 태그를 분리하고, 각 태그 앞에 '#'를 붙입니다.
+      if (user == null) throw Exception("로그인이 필요합니다.");
+
       final tags = _tagsController.text.split(',').map((tag) => '#${tag.trim()}').where((tag) => tag.length > 1).toList();
 
-      await FirebaseFirestore.instance.collection('posts').add({
-        'userName': '형님', // TODO: 실제 유저 이름으로 변경
-        'userImageSeed': 'myprofile',
-        'levelTitle': 'LV.25',
+      final postData = <String, dynamic>{
+        'author': {
+          'name': widget.currentUser['userName'],
+          'imageSeed': widget.currentUser['userImageSeed'],
+          'levelTitle': widget.currentUser['levelTitle'],
+          'uid': user.uid,
+        },
         'time': Timestamp.now(),
-        'caption': _captionController.text.trim(),
+        'caption': caption,
         'tags': tags,
-        'likes': 0,
-        'comments': 0,
         'isCertified': false,
         'isHot': false,
-        'commentsList': [],
-      });
+      };
 
-      if (mounted) {
-        Navigator.of(context).pop();
+      if (_isCreatingPoll) {
+        final options = _pollOptionControllers
+            .map((controller) => controller.text.trim())
+            .where((text) => text.isNotEmpty)
+            .map((text) => {'text': text, 'votes': []})
+            .toList();
+
+        if (options.length < 2) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('투표 항목은 2개 이상이어야 합니다.'), backgroundColor: Colors.red),
+          );
+          setState(() { _isLoading = false; });
+          return;
+        }
+        postData['poll'] = {'options': options};
       }
+
+      await FirebaseFirestore.instance.collection('posts').add(postData);
+
+      if (mounted) Navigator.of(context).pop();
 
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류가 발생했습니다: $e'), backgroundColor: Colors.red),
-      );
-    } finally {
       if (mounted) {
-        setState(() { _isLoading = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류가 발생했습니다: $e'), backgroundColor: Colors.red),
+        );
       }
+    } finally {
+      if (mounted) setState(() { _isLoading = false; });
     }
   }
 
-  @override
-  void dispose() {
-    _captionController.dispose();
-    _tagsController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,22 +162,76 @@ class _CreateCommunityPostScreenState extends State<CreateCommunityPostScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            const Text('사진 (선택)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Container(
-              height: 100,
-              width: 100,
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Theme.of(context).dividerColor),
-              ),
-              child: Center(
-                child: Icon(Icons.add_a_photo_outlined, size: 32, color: Colors.grey[600]),
-              ),
-            ),
+            if (!_isCreatingPoll)
+              OutlinedButton.icon(
+                icon: const Icon(Icons.poll_outlined),
+                label: const Text('투표 추가'),
+                onPressed: () => setState(() => _isCreatingPoll = true),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              )
+            else
+              _buildPollCreator(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPollCreator() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('투표 만들기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () => setState(() => _isCreatingPoll = false),
+              )
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...List.generate(_pollOptionControllers.length, (index) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _pollOptionControllers[index],
+                      decoration: InputDecoration(
+                        hintText: '항목 ${index + 1}',
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                    ),
+                  ),
+                  if (_pollOptionControllers.length > 2)
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline),
+                      onPressed: () => _removePollOption(index),
+                    )
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            icon: const Icon(Icons.add),
+            label: const Text('항목 추가'),
+            onPressed: _addPollOption,
+          ),
+        ],
       ),
     );
   }

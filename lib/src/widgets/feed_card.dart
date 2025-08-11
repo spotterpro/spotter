@@ -1,21 +1,23 @@
+// 📁 lib/src/widgets/feed_card.dart
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:spotter/services/firestore_service.dart';
 import 'package:spotter/src/screens/user_profile_screen.dart';
 import 'package:spotter/src/widgets/comment_bottom_sheet.dart';
-import 'package:spotter/src/screens/post_detail_screen.dart';
 
 class FeedCard extends StatefulWidget {
   final Map<String, dynamic> item;
   final VoidCallback onDelete;
-  // --- 형님의 요청대로 수정된 부분 ---
   final Function(String caption, List<String> tags)? onUpdate;
-  final Function(List<Map<String, dynamic>>) onCommentsUpdated;
 
   const FeedCard({
     super.key,
     required this.item,
     required this.onDelete,
-    this.onUpdate, // onUpdate는 선택적으로 받도록 변경
-    required this.onCommentsUpdated,
+    this.onUpdate,
   });
 
   @override
@@ -23,18 +25,11 @@ class FeedCard extends StatefulWidget {
 }
 
 class _FeedCardState extends State<FeedCard> {
-  late bool _isLiked;
-  late int _likeCount;
-  // --- 형님의 요청대로 추가된 부분 ---
+  final FirestoreService _firestoreService = FirestoreService();
+  final String _currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
   final TextEditingController _captionEditController = TextEditingController();
   final TextEditingController _tagsEditController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _isLiked = false;
-    _likeCount = widget.item['likes'] ?? 0;
-  }
 
   @override
   void dispose() {
@@ -42,34 +37,45 @@ class _FeedCardState extends State<FeedCard> {
     _tagsEditController.dispose();
     super.dispose();
   }
-  // --- 여기까지 추가/수정되었습니다 ---
 
-  void _toggleLike() {
-    setState(() {
-      _isLiked = !_isLiked;
-      _isLiked ? _likeCount++ : _likeCount--;
-    });
+  String _formatTimestamp(Timestamp? timestamp) {
+    if (timestamp == null) return '방금 전';
+    final now = DateTime.now();
+    final postTime = timestamp.toDate();
+    final difference = now.difference(postTime);
+
+    if (difference.inSeconds < 60) return '방금 전';
+    if (difference.inMinutes < 60) return '${difference.inMinutes}분 전';
+    if (difference.inHours < 24) return '${difference.inHours}시간 전';
+    return DateFormat('yyyy.MM.dd').format(postTime);
   }
 
   void _showCommentSheet() {
+    final authorInfo = widget.item['author'] is Map<String, dynamic>
+        ? widget.item['author'] as Map<String, dynamic>
+        : {
+      'name': widget.item['userName'],
+      'imageSeed': widget.item['userImageSeed'],
+      'levelTitle': widget.item['levelTitle'],
+    };
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         return CommentBottomSheet(
-          initialComments:
-          List<Map<String, dynamic>>.from(widget.item['commentsList'] ?? []),
-          onCommentsUpdated: (newComments) {
-            widget.onCommentsUpdated(newComments);
-          },
+          postId: widget.item['id'],
+          currentUser: authorInfo,
         );
       },
     );
   }
 
-  void _showPostMenuSheet() {
-    bool isMyPost = widget.item['userName'] == '형님';
+  void _showPostMenuSheet(Map<String, dynamic> author) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+    bool isMyPost = (author['uid'] != null && author['uid'] == currentUid) || author['name'] == '형님';
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -87,19 +93,13 @@ class _FeedCardState extends State<FeedCard> {
                   title: const Text('수정하기'),
                   onTap: () {
                     Navigator.pop(context);
-                    // --- 형님의 요청대로 수정된 부분 ---
                     if (widget.onUpdate != null) {
                       _showEditPostDialog();
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('이 피드는 수정할 수 없습니다.')),
-                      );
                     }
                   },
                 ),
                 ListTile(
-                  leading:
-                  const Icon(Icons.delete_outline, color: Colors.red),
+                  leading: const Icon(Icons.delete_outline, color: Colors.red),
                   title: const Text('삭제하기', style: TextStyle(color: Colors.red)),
                   onTap: () {
                     Navigator.pop(context);
@@ -131,13 +131,9 @@ class _FeedCardState extends State<FeedCard> {
     );
   }
 
-  // --- 형님의 요청대로 추가된 부분 ---
-  // 게시물 수정 다이얼로그
   void _showEditPostDialog() {
-    // 현재 게시물의 내용을 컨트롤러에 설정합니다.
     _captionEditController.text = (widget.item['caption'] ?? '').toString();
     final currentTags = List<String>.from(widget.item['tags'] ?? []);
-    // '#' 기호를 제거하고 쉼표로 연결하여 보여줍니다.
     _tagsEditController.text = currentTags.map((t) => t.startsWith('#') ? t.substring(1) : t).join(', ');
 
     showDialog(
@@ -151,20 +147,13 @@ class _FeedCardState extends State<FeedCard> {
               children: [
                 TextField(
                   controller: _captionEditController,
-                  decoration: const InputDecoration(
-                    labelText: '내용',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(labelText: '내용', border: OutlineInputBorder()),
                   maxLines: 5,
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _tagsEditController,
-                  decoration: const InputDecoration(
-                    labelText: '태그 (쉼표로 구분)',
-                    hintText: '예: 맛집, 수다, 질문',
-                    border: OutlineInputBorder(),
-                  ),
+                  decoration: const InputDecoration(labelText: '태그 (쉼표로 구분)', hintText: '예: 맛집, 수다, 질문', border: OutlineInputBorder()),
                 ),
               ],
             ),
@@ -178,16 +167,12 @@ class _FeedCardState extends State<FeedCard> {
               child: const Text('저장'),
               onPressed: () {
                 final newCaption = _captionEditController.text.trim();
-                // 입력된 태그를 쉼표 기준으로 나누고, 공백 제거, # 추가
                 final newTags = _tagsEditController.text
                     .split(',')
                     .map((e) => '#${e.trim()}')
                     .where((e) => e.length > 1)
                     .toList();
-
-                // onUpdate 콜백이 있으면 실행
                 widget.onUpdate?.call(newCaption, newTags);
-
                 Navigator.of(dialogContext).pop();
               },
             ),
@@ -196,7 +181,6 @@ class _FeedCardState extends State<FeedCard> {
       },
     );
   }
-  // --- 여기까지 추가되었습니다 ---
 
   void _showDeleteConfirmDialog() {
     showDialog(
@@ -225,11 +209,16 @@ class _FeedCardState extends State<FeedCard> {
 
   @override
   Widget build(BuildContext context) {
-    final int commentCount =
-        (widget.item['commentsList'] as List? ?? []).length;
-    bool isMyPost = widget.item['userName'] == '형님';
+    final author = widget.item['author'] is Map<String, dynamic>
+        ? widget.item['author'] as Map<String, dynamic>
+        : {'name': widget.item['userName'] ?? '알 수 없음', 'imageSeed': widget.item['userImageSeed'], 'levelTitle': widget.item['levelTitle']};
+
+    final authorName = author['name'] ?? '알 수 없음';
+    final authorImageSeed = author['imageSeed'] ?? 'default';
+    final authorLevel = author['levelTitle'] ?? 'LV.1';
 
     final tags = List<String>.from(widget.item['tags'] ?? []);
+    final pollData = widget.item['poll'] as Map<String, dynamic>?;
 
     return Card(
       margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
@@ -246,118 +235,115 @@ class _FeedCardState extends State<FeedCard> {
             child: Row(
               children: [
                 GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const UserProfileScreen()));
-                  },
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const UserProfileScreen())),
                   child: CircleAvatar(
-                      backgroundImage: NetworkImage(
-                          'https://picsum.photos/seed/${widget.item['userImageSeed']}/100/100')),
+                      backgroundImage: NetworkImage('https://picsum.photos/seed/$authorImageSeed/100/100')),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) =>
-                              const UserProfileScreen()));
-                    },
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const UserProfileScreen())),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.item['userName'],
-                            style:
-                            const TextStyle(fontWeight: FontWeight.bold)),
-                        if (widget.item['storeName'] != null &&
-                            (widget.item['storeName'] as String).isNotEmpty)
-                          Text(widget.item['storeName'],
-                              style: const TextStyle(
-                                  color: Colors.grey, fontSize: 12)),
+                        Row(
+                          children: [
+                            Text(authorName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.orange,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                authorLevel,
+                                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                            _formatTimestamp(widget.item['time'] as Timestamp?),
+                            style: const TextStyle(color: Colors.grey, fontSize: 12)
+                        ),
                       ],
                     ),
                   ),
                 ),
-                if (isMyPost)
-                  IconButton(
-                      icon: const Icon(Icons.more_horiz),
-                      onPressed: _showPostMenuSheet),
+                IconButton(
+                    icon: const Icon(Icons.more_horiz),
+                    onPressed: () => _showPostMenuSheet(author)),
               ],
             ),
           ),
           if (widget.item['postImageSeed'] != null)
-            GestureDetector(
-              onTap: () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => PostDetailScreen(item: widget.item)),
-                );
-                if (result == true) {
-                  widget.onDelete();
-                }
-              },
-              child: Image.network(
-                  'https://picsum.photos/seed/${widget.item['postImageSeed']}/600/400',
-                  height: 300,
-                  width: double.infinity,
-                  fit: BoxFit.cover),
-            ),
+            Image.network(
+                'https://picsum.photos/seed/${widget.item['postImageSeed']}/600/400',
+                height: 300,
+                width: double.infinity,
+                fit: BoxFit.cover),
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(widget.item['caption']),
+                if (pollData != null)
+                  _buildPollSection(pollData),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8.0,
                   children: tags
-                      .map((tag) =>
-                      Text(tag, style: TextStyle(color: Colors.blue[600])))
+                      .map((tag) => Text(tag, style: TextStyle(color: Colors.blue[600])))
                       .toList(),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    InkWell(
-                      onTap: _toggleLike,
-                      child: Row(
-                        children: [
-                          Icon(
-                              _isLiked
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              size: 20,
-                              color: _isLiked
-                                  ? Colors.red
-                                  : Colors.grey[700]),
-                          const SizedBox(width: 4),
-                          Text('좋아요 $_likeCount',
-                            style: TextStyle(
-                              color: _isLiked
-                                  ? Colors.red
-                                  : Theme.of(context).textTheme.bodyLarge?.color,
+                    StreamBuilder<bool>(
+                        stream: _firestoreService.isPostLikedByUser(widget.item['id'], _currentUserId),
+                        builder: (context, snapshot) {
+                          final isLiked = snapshot.data ?? false;
+                          return InkWell(
+                            onTap: () => _firestoreService.togglePostLike(widget.item['id'], _currentUserId),
+                            child: Row(
+                              children: [
+                                Icon(
+                                    isLiked ? Icons.favorite : Icons.favorite_border,
+                                    size: 20,
+                                    color: isLiked ? Colors.red : Colors.grey[700]),
+                                const SizedBox(width: 4),
+                                StreamBuilder<int>(
+                                  stream: _firestoreService.getPostLikeCount(widget.item['id']),
+                                  builder: (context, snapshot) {
+                                    return Text('좋아요 ${snapshot.data ?? 0}',
+                                      style: TextStyle(
+                                        color: isLiked ? Colors.red : Theme.of(context).textTheme.bodyLarge?.color,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
+                          );
+                        }
                     ),
                     const SizedBox(width: 16),
                     InkWell(
                       onTap: _showCommentSheet,
                       child: Row(
                         children: [
-                          Icon(Icons.chat_bubble_outline,
-                              size: 20, color: Colors.grey[700]),
+                          Icon(Icons.chat_bubble_outline, size: 20, color: Colors.grey[700]),
                           const SizedBox(width: 4),
-                          Text('댓글 $commentCount',
-                            style: TextStyle(
-                              color: Theme.of(context).textTheme.bodyLarge?.color,
-                            ),
+                          StreamBuilder<int>(
+                              stream: _firestoreService.getCommentsAndRepliesCount(widget.item['id']),
+                              builder: (context, snapshot) {
+                                return Text('댓글 ${snapshot.data ?? 0}',
+                                  style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
+                                );
+                              }
                           ),
                         ],
                       ),
@@ -366,6 +352,78 @@ class _FeedCardState extends State<FeedCard> {
                 )
               ],
             ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPollSection(Map<String, dynamic> pollData) {
+    final options = List<Map<String, dynamic>>.from(pollData['options'] ?? []);
+    final totalVotes = options.fold<int>(0, (sum, option) => sum + (option['votes'] as List).length);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          ...List.generate(options.length, (index) {
+            final option = options[index];
+            final text = option['text'] as String;
+            final votes = (option['votes'] as List);
+            final voteCount = votes.length;
+            final double percentage = totalVotes > 0 ? voteCount / totalVotes : 0;
+            final bool isVotedByUser = votes.contains(_currentUserId);
+            final String percentageText = '${(percentage * 100).toStringAsFixed(0)}%';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: InkWell(
+                onTap: () {
+                  _firestoreService.voteOnPoll(
+                    postId: widget.item['id'],
+                    optionIndex: index,
+                    userId: _currentUserId,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: isVotedByUser ? Colors.orange : Colors.grey.shade300, width: isVotedByUser ? 2 : 1),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      FractionallySizedBox(
+                        widthFactor: percentage,
+                        child: Container(
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            Expanded(child: Text(text, style: TextStyle(fontWeight: isVotedByUser ? FontWeight.bold : FontWeight.normal))),
+                            Text('$percentageText (${voteCount}표)', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+          Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: Text('총 ${totalVotes}명 참여', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
           )
         ],
       ),

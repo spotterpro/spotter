@@ -1,13 +1,16 @@
+// 📁 lib/src/screens/community_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:spotter/src/screens/create_community_post_screen.dart';
 import 'package:spotter/src/widgets/feed_card.dart';
 
 class CommunityScreen extends StatefulWidget {
-  // --- 형님의 요청대로 수정된 부분 ---
-  // main_screen.dart로부터 받던 로컬 데이터 관련 파라미터를 제거합니다.
+  final Map<String, dynamic> currentUser;
+
   const CommunityScreen({
     super.key,
+    required this.currentUser,
   });
 
   @override
@@ -18,8 +21,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
   int _selectedTagIndex = 0;
   final List<String> _tags = ['#전체', '🔥 주간 인기글', '#맛집탐방', '#일상', '#궁금해요'];
 
-  // --- 형님의 요청대로 추가된 부분 ---
-  // Firestore 게시물 삭제 함수
   Future<void> _deletePost(String postId) async {
     try {
       await FirebaseFirestore.instance.collection('posts').doc(postId).delete();
@@ -37,7 +38,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  // Firestore 게시물 수정 함수
   Future<void> _updatePost(String postId, String newCaption, List<String> newTags) async {
     try {
       await FirebaseFirestore.instance.collection('posts').doc(postId).update({
@@ -57,7 +57,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
       }
     }
   }
-  // --- 여기까지 추가되었습니다 ---
 
 
   @override
@@ -140,13 +139,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     final itemWithId = {...data, 'id': docs[index].id };
                     return FeedCard(
                       item: itemWithId,
-                      // --- 형님의 요청대로 수정된 부분 ---
-                      // Firestore 제어 함수를 콜백으로 전달합니다.
                       onDelete: () => _deletePost(itemWithId['id']),
                       onUpdate: (caption, tags) => _updatePost(itemWithId['id'], caption, tags),
-                      onCommentsUpdated: (newComments) {
-                        // TODO: 댓글 업데이트 로직도 Firestore와 연동해야 합니다.
-                      },
                     );
                   },
                   separatorBuilder: (context, index) => const SizedBox(height: 8),
@@ -158,7 +152,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const CreateCommunityPostScreen()));
+          Navigator.push(context, MaterialPageRoute(builder: (context) => CreateCommunityPostScreen(currentUser: widget.currentUser)));
         },
         backgroundColor: Colors.orange,
         child: const Icon(Icons.edit, color: Colors.white),
