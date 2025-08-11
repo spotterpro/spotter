@@ -197,6 +197,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       item: itemWithId,
                       onDelete: () => _deletePost(itemWithId['id']),
                       onUpdate: (caption, tags) => _updatePost(itemWithId['id'], caption, tags),
+                      currentUser: widget.currentUser, // 수정된 부분
                     );
                   },
                   separatorBuilder: (context, index) => const SizedBox(height: 8),

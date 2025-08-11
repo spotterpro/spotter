@@ -7,7 +7,6 @@ import 'package:spotter/models/user_model.dart';
 import 'package:spotter/src/screens/store_detail_screen.dart';
 
 class CrewStudioScreen extends StatefulWidget {
-  // --- 형님의 요청대로 수정된 부분 ---
   final UserProfile userProfile;
 
   const CrewStudioScreen({
@@ -37,8 +36,6 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
 
   @override
   Widget build(BuildContext context) {
-    // --- 형님의 요청대로 수정된 부분 ---
-    // 화면 전체를 StreamBuilder로 감싸 실시간 데이터를 받습니다.
     return StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance.collection('users').doc(_currentUserId).snapshots(),
         builder: (context, snapshot) {
@@ -64,7 +61,7 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
             body: TabBarView(
               controller: _tabController,
               children: <Widget>[
-                _buildDashboardTab(context, userProfile), // 실시간 데이터 전달
+                _buildDashboardTab(context, userProfile),
                 _buildRegularStoresTab(),
                 _buildSponsorshipTab(),
               ],
@@ -89,13 +86,12 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
             childAspectRatio: 1.2,
-            // --- 형님의 요청대로 수정된 부분 ---
-            // 모든 통계를 실시간 데이터로 교체합니다.
             children: [
+              // --- 형님의 요청대로 수정된 부분 ---
               _InfoCard(icon: Icons.arrow_upward, title: '나의 레벨', value: userProfile.levelTitle, color: Colors.green),
               _InfoCard(icon: Icons.flash_on, title: '경험치(XP)', value: '${userProfile.xp}', color: Colors.orange),
-              _InfoCard(icon: Icons.business_center_outlined, title: '진행중인 스폰서쉽', value: '0', color: Colors.blue), // TODO: 데이터 연동 필요
-              _InfoCard(icon: Icons.check_circle_outline, title: '총 태깅 발생', value: '0', color: Colors.purple), // TODO: 데이터 연동 필요
+              _InfoCard(icon: Icons.business_center_outlined, title: '진행중인 스폰서쉽', value: '0', color: Colors.blue),
+              _InfoCard(icon: Icons.check_circle_outline, title: '총 태깅 발생', value: '0', color: Colors.purple),
             ],
           ),
           const SizedBox(height: 24),
@@ -106,7 +102,6 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
     );
   }
 
-  // ... (이하 _buildRegularStoresTab, _buildSponsorshipTab, _buildRankingSection 등 나머지 코드는 동일)
   Widget _buildRegularStoresTab() {
     final regularStores = [
       { 'name': '카페 스프링', 'category': '카페', 'seed': 'cafe', 'storeData': { 'storeName': '카페 스프링', 'regulars': 98, 'seed': 'cafe', 'category': '카페', 'description': '신선한 원두와 함께하는 여유', 'address': '대구시 수성구' } },

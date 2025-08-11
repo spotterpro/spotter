@@ -1,13 +1,14 @@
 // 📁 lib/src/screens/user_profile_screen.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:spotter/models/user_model.dart';
-import 'package:spotter/src/widgets/feed_card.dart'; // FeedCard를 재사용하기 위해 임포트
+import 'package:spotter/src/widgets/feed_card.dart';
 
 class UserProfileScreen extends StatefulWidget {
-  // --- 형님의 요청대로 수정된 부분 ---
-  final String userId; // 특정 사용자의 ID를 받도록 변경
+  final String userId;
 
   const UserProfileScreen({
     super.key,
@@ -33,76 +34,107 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
     super.dispose();
   }
 
-  // --- 삭제/수정 기능은 MyPageScreen과 동일하게 유지 ---
   Future<void> _deletePost(String postId) async {
-    // ... (MyPageScreen의 _deletePost와 동일한 로직)
+    try {
+      await FirebaseFirestore.instance.collection('posts').doc(postId).delete();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('게시물이 삭제되었습니다.')),
+        );
+      }
+    } catch (e) {
+      // Handle error
+    }
   }
 
   Future<void> _updatePost(String postId, String newCaption, List<String> newTags) async {
-    // ... (MyPageScreen의 _updatePost와 동일한 로직)
+    try {
+      await FirebaseFirestore.instance.collection('posts').doc(postId).update({
+        'caption': newCaption,
+        'tags': newTags,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('게시물이 수정되었습니다.')),
+        );
+      }
+    } catch (e) {
+      // Handle error
+    }
   }
 
 
   @override
   Widget build(BuildContext context) {
-    // --- 형님의 요청대로 수정된 부분 ---
-    // 화면 전체를 StreamBuilder로 감싸서 userId에 해당하는 사용자 정보를 실시간으로 가져옵니다.
-    return StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(widget.userId).snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
-          }
-          if (!snapshot.data!.exists) {
-            return const Scaffold(body: Center(child: Text('사용자 정보를 찾을 수 없습니다.')));
-          }
+    final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (currentUserId.isEmpty) {
+      return const Scaffold(body: Center(child: Text('로그인이 필요합니다.')));
+    }
 
-          final userProfile = UserProfile.fromDocument(snapshot.data!);
-          final primary = Theme.of(context).colorScheme.primary;
+    final profileUserStream = FirebaseFirestore.instance.collection('users').doc(widget.userId).snapshots();
+    final currentUserStream = FirebaseFirestore.instance.collection('users').doc(currentUserId).snapshots();
 
-          return Scaffold(
-            body: NestedScrollView(
-              headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
-                return <Widget>[
-                  // AppBar를 SliverAppBar로 변경하여 스크롤 시 자연스럽게 보이도록 개선
-                  SliverAppBar(
-                    pinned: false,
-                    floating: true,
-                    title: Text(userProfile.userName),
-                  ),
-                  SliverToBoxAdapter(child: _buildProfileHeader(context, userProfile)),
-                  SliverPersistentHeader(
-                    pinned: true,
-                    delegate: _TabBarDelegate(
-                      TabBar(
-                        controller: _tabController,
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        indicator: UnderlineTabIndicator(borderSide: BorderSide(width: 3, color: primary)),
-                        tabs: const [
-                          Tab(text: '인증 피드'),
-                          Tab(text: '작성한 글'),
-                        ],
-                      ),
+    return StreamBuilder<List<DocumentSnapshot>>(
+      stream: CombineLatestStream.list([profileUserStream, currentUserStream]),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.length < 2) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        final profileUserDoc = snapshot.data![0];
+        final currentUserDoc = snapshot.data![1];
+
+        if (!profileUserDoc.exists) {
+          return const Scaffold(body: Center(child: Text('사용자 정보를 찾을 수 없습니다.')));
+        }
+        if (!currentUserDoc.exists) {
+          return const Scaffold(body: Center(child: Text('현재 사용자 정보를 불러올 수 없습니다.')));
+        }
+
+        final userProfile = UserProfile.fromDocument(profileUserDoc);
+        final currentUserMap = UserProfile.fromDocument(currentUserDoc).toMap();
+        final primary = Theme.of(context).colorScheme.primary;
+
+        return Scaffold(
+          body: NestedScrollView(
+            headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
+              return <Widget>[
+                SliverAppBar(
+                  pinned: false,
+                  floating: true,
+                  title: Text(userProfile.userName),
+                ),
+                SliverToBoxAdapter(child: _buildProfileHeader(context, userProfile)),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _TabBarDelegate(
+                    TabBar(
+                      controller: _tabController,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: UnderlineTabIndicator(borderSide: BorderSide(width: 3, color: primary)),
+                      tabs: const [
+                        Tab(text: '인증 피드'),
+                        Tab(text: '작성한 글'),
+                      ],
                     ),
                   ),
-                ];
-              },
-              body: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildUserFeeds(isCertified: true),
-                  _buildUserFeeds(isCertified: false),
-                ],
-              ),
+                ),
+              ];
+            },
+            body: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildUserFeeds(isCertified: true),
+                _buildUserFeeds(isCertified: false, currentUser: currentUserMap),
+              ],
             ),
-          );
-        }
+          ),
+        );
+      },
     );
   }
 
-  // --- 기존 MyPageScreen의 헤더 UI를 재사용 ---
   Widget _buildProfileHeader(BuildContext context, UserProfile userProfile) {
-    // ... (MyPageScreen의 _buildProfileHeader와 거의 동일, Settings 버튼만 제거)
     return Container(
       color: Theme.of(context).cardColor,
       padding: const EdgeInsets.all(16.0),
@@ -117,15 +149,29 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _ProfileStat(count: '${userProfile.crewCount}', label: '크루원'),
-                    _ProfileStat(count: '${userProfile.myCrewCount}', label: '나의 크루'),
-                    _ProfileStat(count: '${userProfile.influence}', label: '영향력'),
+                    Text(userProfile.userName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    // --- 형님의 요청대로 수정된 부분 ---
+                    Text(
+                      userProfile.levelTitle, // 레벨만 표시
+                      style: const TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
                   ],
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _ProfileStat(count: '${userProfile.crewCount}', label: '크루원'),
+              _ProfileStat(count: '${userProfile.myCrewCount}', label: '나의 크루'),
+              // --- 형님의 요청대로 수정된 부분 ---
+              _ProfileStat(count: userProfile.influenceTitle, label: '칭호'),
             ],
           ),
           const SizedBox(height: 16),
@@ -136,8 +182,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
     );
   }
 
-  // --- 기존 MyPageScreen의 피드 조회 로직을 재사용 및 통합 ---
-  Widget _buildUserFeeds({required bool isCertified}) {
+  Widget _buildUserFeeds({required bool isCertified, Map<String, dynamic>? currentUser}) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('posts')
@@ -155,7 +200,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
         final docs = snapshot.data!.docs;
 
         if (isCertified) {
-          // 인증 피드 (그리드 뷰)
           return GridView.builder(
             padding: const EdgeInsets.all(8),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -174,7 +218,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
             },
           );
         } else {
-          // 작성한 글 (리스트 뷰)
           return ListView.builder(
             padding: EdgeInsets.zero,
             itemCount: docs.length,
@@ -186,6 +229,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
                 item: itemWithId,
                 onDelete: () => _deletePost(itemWithId['id']),
                 onUpdate: (caption, tags) => _updatePost(itemWithId['id'], caption, tags),
+                currentUser: currentUser!,
               );
             },
           );
@@ -195,7 +239,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
   }
 }
 
-// --- 기존 MyPageScreen의 위젯들을 재사용 ---
 class _ProfileStat extends StatelessWidget {
   final String count;
   final String label;

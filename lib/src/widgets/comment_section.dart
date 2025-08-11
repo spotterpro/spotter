@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:spotter/services/firestore_service.dart';
+import 'package:spotter/src/screens/user_profile_screen.dart'; // 추가된 부분
 
 class CommentSection extends StatefulWidget {
   final String postId;
@@ -28,6 +29,7 @@ class _CommentSectionState extends State<CommentSection> {
 
   Map<String, dynamic>? _replyingTo;
   DocumentReference? _editingDocRef;
+  final Map<String, bool> _expandedReplies = {};
 
   @override
   void dispose() {
@@ -49,7 +51,7 @@ class _CommentSectionState extends State<CommentSection> {
     return DateFormat('yyyy.MM.dd').format(postTime);
   }
 
-  void _submitComment() async { // async 키워드 추가
+  void _submitComment() async {
     if (_commentController.text.trim().isEmpty) return;
 
     final user = FirebaseAuth.instance.currentUser;
@@ -66,15 +68,16 @@ class _CommentSectionState extends State<CommentSection> {
       await _firestoreService.updateComment(_editingDocRef!, _commentController.text.trim());
       setState(() { _editingDocRef = null; });
     } else if (_replyingTo != null) {
+      final commentId = _replyingTo!['id'];
       await _firestoreService.addReply(
-          widget.postId, _replyingTo!['id'], _commentController.text.trim(), currentUserInfo);
-      // --- 형님의 요청대로 추가된 부분 ---
-      // 대댓글 작성 보상으로 +2 XP를 적립합니다.
+          widget.postId, commentId, _commentController.text.trim(), currentUserInfo);
       await _firestoreService.incrementUserXp(user.uid, 2);
-      setState(() { _replyingTo = null; });
+      setState(() {
+        _expandedReplies[commentId] = true;
+        _replyingTo = null;
+      });
     } else {
       await _firestoreService.addComment(widget.postId, _commentController.text.trim(), currentUserInfo);
-      // 댓글 작성 보상으로 +2 XP를 적립합니다.
       await _firestoreService.incrementUserXp(user.uid, 2);
     }
 
@@ -99,9 +102,16 @@ class _CommentSectionState extends State<CommentSection> {
     });
   }
 
+  // --- 형님의 요청대로 추가된 부분 ---
+  void _navigateToUserProfile(String userId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => UserProfileScreen(userId: userId)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // ... (기존 build 메소드는 동일하게 유지)
     return Column(
       children: [
         Expanded(
@@ -152,62 +162,107 @@ class _CommentSectionState extends State<CommentSection> {
   }
 
   Widget _buildCommentTree(DocumentSnapshot commentDoc) {
-    // ... (기존 _buildCommentTree 메소드는 동일하게 유지)
-    final commentData = commentDoc.data() as Map<String, dynamic>;
+    final commentId = commentDoc.id;
+    final isExpanded = _expandedReplies.putIfAbsent(commentId, () => false);
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildCommentItem(commentDoc.reference, commentData),
         StreamBuilder<QuerySnapshot>(
-            stream: _firestoreService.getReplies(widget.postId, commentDoc.id),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox.shrink();
-              final replies = snapshot.data!.docs;
-              return Padding(
-                padding: const EdgeInsets.only(left: 40.0),
-                child: Column(
-                  children: replies.map((replyDoc) {
-                    return _buildCommentItem(replyDoc.reference, replyDoc.data() as Map<String, dynamic>, isReply: true);
-                  }).toList(),
+          stream: _firestoreService.getReplies(widget.postId, commentId),
+          builder: (context, snapshot) {
+            final replies = snapshot.data?.docs ?? [];
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCommentItem(
+                  commentDoc.reference,
+                  commentDoc.data() as Map<String, dynamic>,
+                  replyCount: replies.length,
+                  isExpanded: isExpanded,
+                  onToggleReplies: () {
+                    setState(() {
+                      _expandedReplies[commentId] = !isExpanded;
+                    });
+                  },
                 ),
-              );
-            }
+                if (isExpanded)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 58.0),
+                    child: Column(
+                      children: replies.map((replyDoc) {
+                        return _buildCommentItem(
+                          replyDoc.reference,
+                          replyDoc.data() as Map<String, dynamic>,
+                          isReply: true,
+                        );
+                      }).toList(),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ],
     );
   }
 
-  Widget _buildCommentItem(DocumentReference docRef, Map<String, dynamic> data, {bool isReply = false}) {
-    // ... (기존 _buildCommentItem 메소드는 동일하게 유지)
+  Widget _buildCommentItem(
+      DocumentReference docRef,
+      Map<String, dynamic> data, {
+        bool isReply = false,
+        int replyCount = 0,
+        bool isExpanded = false,
+        VoidCallback? onToggleReplies,
+      }) {
     final author = data['author'] as Map<String, dynamic>? ?? {};
     final authorName = author['name'] ?? '알 수 없음';
     final authorImageSeed = author['imageSeed'] ?? 'default';
     final authorLevel = author['levelTitle'] ?? 'LV.1';
-    final authorUid = author['uid'];
+    final authorUid = author['uid'] as String?; // uid를 String? 타입으로 받습니다.
 
     bool isMyComment = authorUid != null && authorUid == FirebaseAuth.instance.currentUser?.uid;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+      padding: isReply
+          ? const EdgeInsets.only(top: 12.0)
+          : const EdgeInsets.fromLTRB(16, 12, 8, 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(radius: 18, backgroundImage: NetworkImage('https://picsum.photos/seed/$authorImageSeed/100/100')),
+          // --- 형님의 요청대로 수정된 부분 ---
+          GestureDetector(
+            onTap: () {
+              if (authorUid != null) {
+                _navigateToUserProfile(authorUid);
+              }
+            },
+            child: CircleAvatar(radius: 18, backgroundImage: NetworkImage('https://picsum.photos/seed/$authorImageSeed/100/100')),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(authorName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(4)),
-                      child: Text(authorLevel, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
+                // --- 형님의 요청대로 수정된 부분 ---
+                GestureDetector(
+                  onTap: () {
+                    if (authorUid != null) {
+                      _navigateToUserProfile(authorUid);
+                    }
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min, // Row가 최소한의 공간만 차지하도록 설정
+                    children: [
+                      Text(authorName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(color: Colors.orange, borderRadius: BorderRadius.circular(4)),
+                        child: Text(authorLevel, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(data['text'] ?? ''),
@@ -222,6 +277,7 @@ class _CommentSectionState extends State<CommentSection> {
                           setState(() {
                             _replyingTo = {'id': docRef.id, 'name': authorName};
                             _editingDocRef = null;
+                            _commentController.clear();
                           });
                           _commentFocusNode.requestFocus();
                         },
@@ -230,6 +286,28 @@ class _CommentSectionState extends State<CommentSection> {
                     ],
                   ],
                 ),
+                if (!isReply && replyCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: InkWell(
+                      onTap: onToggleReplies,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            isExpanded ? '답글 숨기기' : '답글 $replyCount개 보기',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 12, fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(
+                            isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            size: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -244,7 +322,6 @@ class _CommentSectionState extends State<CommentSection> {
   }
 
   void _showEditDeleteMenu(BuildContext context, DocumentReference docRef, String currentText) {
-    // ... (기존 _showEditDeleteMenu 메소드는 동일하게 유지)
     showModalBottomSheet(
       context: context, backgroundColor: Colors.transparent,
       builder: (context) {
@@ -274,7 +351,6 @@ class _CommentSectionState extends State<CommentSection> {
   }
 
   Widget _buildCommentInput() {
-    // ... (기존 _buildCommentInput 메소드는 동일하게 유지)
     final isEditing = _editingDocRef != null;
     final isReplying = _replyingTo != null;
     String hintText = '댓글 달기...';

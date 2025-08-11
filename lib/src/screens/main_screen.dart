@@ -72,7 +72,8 @@ class _MainScreenState extends State<MainScreen> {
     final List<Widget> pages = [
       HomeScreen(
         feedItems: _allFeedItems,
-        onDelete: _deleteFeedItem, // null 대신 정상적인 함수를 전달합니다.
+        onDelete: _deleteFeedItem,
+        currentUser: currentUserMap, // 수정된 부분
       ),
       CommunityScreen(currentUser: currentUserMap),
       UploadFeedScreen(currentUser: currentUserMap),

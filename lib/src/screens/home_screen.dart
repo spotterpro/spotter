@@ -8,14 +8,13 @@ import 'package:spotter/src/widgets/feed_card.dart';
 class HomeScreen extends StatefulWidget {
   final List<Map<String, dynamic>> feedItems;
   final Function(String) onDelete;
-  // --- 형님의 요청대로 수정된 부분 ---
-  // final Function(String, List<Map<String, dynamic>>) onCommentsUpdated; // 더 이상 사용하지 않으므로 제거
+  final Map<String, dynamic> currentUser; // 추가된 부분
 
   const HomeScreen({
     Key? key,
     required this.feedItems,
     required this.onDelete,
-    // required this.onCommentsUpdated, // 제거
+    required this.currentUser, // 추가된 부분
   }) : super(key: key);
 
   @override
@@ -95,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
           key: ValueKey(item['id']),
           item: item,
           onDelete: () => widget.onDelete(item['id'] as String),
-          // onCommentsUpdated: (newComments) => widget.onCommentsUpdated(item['id'] as String, newComments), // 제거
+          currentUser: widget.currentUser, // 수정된 부분
         );
       },
     );

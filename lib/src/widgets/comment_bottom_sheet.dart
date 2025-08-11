@@ -5,8 +5,6 @@ import 'package:spotter/src/widgets/comment_section.dart';
 
 class CommentBottomSheet extends StatelessWidget {
   final String postId;
-  // --- 형님의 요청대로 수정된 부분 ---
-  // 현재 사용자 정보를 받기 위한 파라미터 추가
   final Map<String, dynamic> currentUser;
 
   const CommentBottomSheet({
@@ -34,8 +32,6 @@ class CommentBottomSheet extends StatelessWidget {
             Expanded(
               child: CommentSection(
                 postId: postId,
-                // --- 형님의 요청대로 수정된 부분 ---
-                // CommentSection으로 현재 사용자 정보 전달
                 currentUser: currentUser,
               ),
             ),

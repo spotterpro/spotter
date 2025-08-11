@@ -95,15 +95,7 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
               headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
                 return <Widget>[
                   SliverToBoxAdapter(
-                    child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => UserProfileScreen(userId: userProfile.uid)),
-                          );
-                        },
-                        child: _buildProfileHeader(context, userProfile)
-                    ),
+                    child: _buildProfileHeader(context, userProfile),
                   ),
                   SliverPersistentHeader(
                     pinned: true,
@@ -161,8 +153,9 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
                     Text(userProfile.userName,
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
+                    // --- 형님의 요청대로 수정된 부분 ---
                     Text(
-                      '${userProfile.levelTitle} 동네 탐험가',
+                      userProfile.levelTitle, // 레벨만 표시
                       style: const TextStyle(color: Colors.grey, fontSize: 14),
                     ),
                   ],
@@ -193,10 +186,8 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
               ),
             ),
           const SizedBox(height: 24),
-          // --- 형님의 요청대로 수정된 부분 ---
           GestureDetector(
             onTap: () {
-              // MyGrowthLogScreen으로 실시간 userProfile 객체를 전달합니다.
               Navigator.push(context, MaterialPageRoute(builder: (context) => MyGrowthLogScreen(userProfile: userProfile)));
             },
             child: Column(
@@ -226,7 +217,8 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
             children: [
               _ProfileStat(count: '${userProfile.crewCount}', label: '크루원'),
               _ProfileStat(count: '${userProfile.myCrewCount}', label: '나의 크루'),
-              _ProfileStat(count: '${userProfile.influence}', label: '영향력'),
+              // --- 형님의 요청대로 수정된 부분 ---
+              _ProfileStat(count: userProfile.influenceTitle, label: '칭호'),
             ],
           ),
           const SizedBox(height: 24),
@@ -317,6 +309,7 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
               item: itemWithId,
               onDelete: () => _deletePost(itemWithId['id']),
               onUpdate: (caption, tags) => _updatePost(itemWithId['id'], caption, tags),
+              currentUser: userProfile.toMap(),
             );
           },
         );

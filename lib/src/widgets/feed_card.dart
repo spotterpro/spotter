@@ -12,12 +12,14 @@ class FeedCard extends StatefulWidget {
   final Map<String, dynamic> item;
   final VoidCallback onDelete;
   final Function(String caption, List<String> tags)? onUpdate;
+  final Map<String, dynamic> currentUser; // 추가된 부분
 
   const FeedCard({
     super.key,
     required this.item,
     required this.onDelete,
     this.onUpdate,
+    required this.currentUser, // 추가된 부분
   });
 
   @override
@@ -51,14 +53,6 @@ class _FeedCardState extends State<FeedCard> {
   }
 
   void _showCommentSheet() {
-    final authorInfo = widget.item['author'] is Map<String, dynamic>
-        ? widget.item['author'] as Map<String, dynamic>
-        : {
-      'name': widget.item['userName'],
-      'imageSeed': widget.item['userImageSeed'],
-      'levelTitle': widget.item['levelTitle'],
-    };
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -66,7 +60,7 @@ class _FeedCardState extends State<FeedCard> {
       builder: (context) {
         return CommentBottomSheet(
           postId: widget.item['id'],
-          currentUser: authorInfo,
+          currentUser: widget.currentUser, // 수정된 부분
         );
       },
     );

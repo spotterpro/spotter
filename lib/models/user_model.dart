@@ -32,14 +32,33 @@ class UserProfile {
   int get xpForNextLevel => nextLevelXp - currentLevelXp;
   int get currentXpInLevel => xp - currentLevelXp;
   double get levelProgress => xpForNextLevel == 0 ? 0 : currentXpInLevel / xpForNextLevel;
+
+  // --- 형님의 요청대로 수정된 부분 ---
   String get levelTitle => 'LV.$level';
+
+  String get influenceTitle {
+    if (influence >= 1000) {
+      return '스팟 인플루언서';
+    } else if (influence >= 500) {
+      return '골목대장';
+    } else if (influence >= 250) {
+      return '단골손님';
+    } else if (influence >= 100) {
+      return '동네 주민';
+    } else {
+      return '새싹 스포터';
+    }
+  }
+
+  String get levelWithInfluenceTitle => '$levelTitle $influenceTitle';
+
 
   factory UserProfile.fromDocument(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     return UserProfile(
       uid: doc.id,
       email: data['email'] ?? '',
-      userName: data['userName'] ?? '사용자', // Firestore의 필드명은 'userName'으로 유지
+      userName: data['userName'] ?? '사용자',
       userImageSeed: data['userImageSeed'] ?? 'defaultUser',
       bio: data['bio'] ?? '',
       xp: data['xp'] ?? 0,
@@ -49,15 +68,13 @@ class UserProfile {
     );
   }
 
-  // --- 형님의 요청대로 수정된 부분 ---
-  // FeedCard에서 사용하는 'name' 키에 맞춰 데이터를 변환합니다.
   Map<String, dynamic> toMap() {
     return {
       'uid': uid,
       'email': email,
-      'name': userName, // 'userName'을 'name'으로 매핑
-      'userName': userName, // 기존 호환성을 위해 유지
-      'levelTitle': levelTitle,
+      'name': userName,
+      'userName': userName,
+      'levelTitle': levelWithInfluenceTitle,
       'userImageSeed': userImageSeed,
       'bio': bio,
       'xp': xp,
