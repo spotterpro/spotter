@@ -18,16 +18,18 @@ val flutterVersionName: String = localProperties.getProperty("flutter.versionNam
 
 android {
     namespace = "com.example.spotter"
-    compileSdk = 35 // 버전 34 -> 35로 상향
-    ndkVersion = "27.0.12077973" // 버전 25 -> 27로 상향
+    compileSdk = 35
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        // 👑 --- 형님의 요청대로 수정된 부분 ---
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = "1.8"
+        // 👑 --- 형님의 요청대로 수정된 부분 ---
+        jvmTarget = "17"
     }
 
     sourceSets {
@@ -37,7 +39,7 @@ android {
     defaultConfig {
         applicationId = "com.example.spotter"
         minSdk = 21
-        targetSdk = 34 // targetSdk는 일단 유지해도 괜찮습니다.
+        targetSdk = 34
         versionCode = flutterVersionCode.toInt()
         versionName = flutterVersionName
     }
@@ -56,5 +58,4 @@ flutter {
 }
 
 dependencies {
-    // 필요한 의존성을 여기에 추가할 수 있습니다.
 }

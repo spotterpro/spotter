@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spotter/src/screens/admin/admin_application_detail_screen.dart';
 
-// --- 형님의 요청대로 StatefulWidget으로 변경 ---
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -34,6 +33,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       appBar: AppBar(
         title: const Text('가게 심사 대시보드'),
         actions: [
+          // 👑 --- 형님의 요청대로 새로고침 버튼 추가 --- 👑
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: '새로고침',
+            onPressed: () {
+              // setState를 호출하여 위젯을 다시 그리게 함으로써
+              // StreamBuilder가 스트림을 새로 구독하도록 강제합니다.
+              setState(() {});
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: '로그아웃',
@@ -42,7 +51,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
             },
           )
         ],
-        // --- 탭 바 추가 ---
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -52,7 +60,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
           ],
         ),
       ),
-      // --- 탭 화면 추가 ---
       body: TabBarView(
         controller: _tabController,
         children: [
@@ -64,7 +71,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
     );
   }
 
-  // --- 상태별 목록을 보여주는 위젯 ---
   Widget _buildApplicationList({required String status}) {
     String emptyMessage = '해당 상태의 요청이 없습니다.';
     if (status == 'pending') emptyMessage = '대기 중인 심사 요청이 없습니다.';

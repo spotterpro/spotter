@@ -8,6 +8,8 @@
 	<string>현재 위치를 지도에 표시하기 위해 위치 정보 접근 권한이 필요합니다.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>앱이 백그라운드에 있을 때도 위치 정보를 사용하기 위해 권한이 필요합니다.</string>
+	<key>NFCReaderUsageDescription</key>
+	<string>가게 스탬프 등록 및 적립을 위해 NFC 기능이 필요합니다.</string>
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>
 

@@ -19,6 +19,39 @@ class AdminApplicationDetailScreen extends StatefulWidget {
 
 class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScreen> {
   bool _isProcessing = false;
+  // 👑 --- NFC 정보를 저장할 상태 변수 추가 --- 👑
+  String? _nfcTagId;
+  bool _isLoadingNfc = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // 👑 --- 화면이 시작될 때 NFC 정보를 가져옵니다 --- 👑
+    if (widget.applicationData['status'] == 'approved') {
+      _fetchNfcData();
+    } else {
+      _isLoadingNfc = false;
+    }
+  }
+
+  // 👑 --- 가게 ID를 이용해 stores 컬렉션에서 NFC 태그 ID를 가져오는 함수 --- 👑
+  Future<void> _fetchNfcData() async {
+    try {
+      final storeDoc = await FirebaseFirestore.instance.collection('stores').doc(widget.applicationId).get();
+      if (storeDoc.exists && storeDoc.data()!.containsKey('nfcTagId')) {
+        setState(() {
+          _nfcTagId = storeDoc.data()!['nfcTagId'] as String?;
+        });
+      }
+    } catch (e) {
+      print("NFC 데이터 로딩 실패: $e");
+    } finally {
+      setState(() {
+        _isLoadingNfc = false;
+      });
+    }
+  }
+
 
   Future<void> _updateStatus(String newStatus) async {
     setState(() { _isProcessing = true; });
@@ -108,46 +141,56 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
             _buildInfoTile('전화번호', data['phone']),
             _buildInfoTile('영업 시간', data['hours']),
             _buildInfoTile('신청자 UID', data['userId']),
-            const SizedBox(height: 32),
-            if (_isProcessing)
-              const Center(child: CircularProgressIndicator())
-            else
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _updateStatus('approved'),
-                      icon: const Icon(Icons.check),
-                      label: const Text('승인'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _updateStatus('rejected'),
-                      icon: const Icon(Icons.close),
-                      label: const Text('반려'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-                ],
+
+            // 👑 --- 승인된 가게일 경우에만 NFC 정보 표시 --- 👑
+            if (data['status'] == 'approved')
+              _buildInfoTile(
+                '등록된 NFC 태그 ID',
+                _isLoadingNfc ? '로딩 중...' : (_nfcTagId ?? '아직 등록되지 않음'),
               ),
+
+            const SizedBox(height: 32),
+
+            // 👑 --- 심사 대기 중인 신청 건에 대해서만 버튼을 표시 --- 👑
+            if (data['status'] == 'pending')
+              if (_isProcessing)
+                const Center(child: CircularProgressIndicator())
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _updateStatus('approved'),
+                        icon: const Icon(Icons.check),
+                        label: const Text('승인'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _updateStatus('rejected'),
+                        icon: const Icon(Icons.close),
+                        label: const Text('반려'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
           ],
         ),
       ),
     );
   }
 
-  // --- 형님의 요청대로 수정된 부분 ---
   Widget _buildInfoTile(String title, dynamic value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
@@ -159,7 +202,6 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
             style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
           ),
           const SizedBox(height: 4),
-          // Text를 SelectableText로 변경하여 복사 기능을 활성화합니다.
           SelectableText(
             value?.toString() ?? '정보 없음',
             style: const TextStyle(fontSize: 16),

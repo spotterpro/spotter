@@ -1,12 +1,18 @@
 // 📁 lib/src/screens/application_status_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:spotter/src/screens/store_switch_screen.dart'; // 추가된 부분
+import 'package:spotter/src/screens/nfc_registration_screen.dart';
+import 'package:spotter/src/screens/store_switch_screen.dart';
 
 class ApplicationStatusScreen extends StatelessWidget {
   final String status;
+  final String? storeId; // 가게 ID를 받을 변수 추가
 
-  const ApplicationStatusScreen({super.key, required this.status});
+  const ApplicationStatusScreen({
+    super.key,
+    required this.status,
+    this.storeId, // 생성자에 추가
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -29,8 +35,23 @@ class ApplicationStatusScreen extends StatelessWidget {
           title: '심사가 완료되었습니다!',
           message: '이제 사장님의 가게에 NFC 스티커를 등록하고\n손님들을 위한 스탬프 투어를 만들어보세요!',
           button: ElevatedButton.icon(
-            onPressed: () {
-              // TODO: NFC 등록 화면으로 이동
+            // --- 형님의 요청대로 수정된 부분 ---
+            onPressed: () async {
+              if (storeId != null) {
+                // NfcRegistrationScreen에서 true 값을 반환하는지 기다립니다.
+                final result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(builder: (context) => NfcRegistrationScreen(storeId: storeId!)),
+                );
+                // 만약 등록이 성공적으로 완료되었다면(true), 이 화면도 닫습니다.
+                if (result == true && context.mounted) {
+                  Navigator.of(context).pop();
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('가게 ID가 없어 NFC 등록을 진행할 수 없습니다.'), backgroundColor: Colors.red),
+                );
+              }
             },
             icon: const Icon(Icons.nfc_rounded),
             label: const Text('NFC 스티커 등록하기'),
@@ -48,10 +69,8 @@ class ApplicationStatusScreen extends StatelessWidget {
           iconColor: Colors.red,
           title: '심사 요청이 반려되었습니다.',
           message: '아쉽지만, 일부 정보가 명확하지 않아 심사가 반려되었어요.\n정보를 수정하여 다시 신청해주세요.',
-          // --- 형님의 요청대로 수정된 부분 ---
           button: ElevatedButton(
             onPressed: () {
-              // 반려 화면을 닫고, 신청서 작성 화면으로 새로 이동합니다.
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (context) => const StoreSwitchScreen()),
               );

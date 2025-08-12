@@ -10,6 +10,7 @@ import 'package:spotter/src/screens/announcements_screen.dart';
 import 'package:spotter/src/screens/application_status_screen.dart';
 import 'package:spotter/src/screens/customer_service_screen.dart';
 import 'package:spotter/src/screens/edit_profile_screen.dart';
+import 'package:spotter/src/screens/owner/store_management_screen.dart'; // 👑 추가된 부분
 import 'package:spotter/src/screens/store_switch_screen.dart';
 import 'package:spotter/src/screens/terms_and_policies_screen.dart';
 
@@ -51,32 +52,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
     prefs.setBool(key, value);
   }
 
-  // --- 형님의 요청대로 추가된 부분 ---
+  // --- 👑 형님의 요청대로 전면 수정된 부분 ---
   Future<void> _navigateToStoreSwitch() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final doc = await FirebaseFirestore.instance
-        .collection('store_applications')
-        .doc(user.uid)
-        .get();
+    // 1. 이미 등록된 가게가 있는지 먼저 확인합니다.
+    final storeDoc = await FirebaseFirestore.instance.collection('stores').doc(user.uid).get();
 
     if (mounted) {
-      if (doc.exists) {
-        // 신청 기록이 있으면 -> 신청 현황 화면으로
-        final status = doc.data()?['status'] ?? 'pending';
+      if (storeDoc.exists) {
+        // 가게가 존재하면, 바로 가게 관리 대시보드로 이동합니다.
         Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => ApplicationStatusScreen(status: status),
-          ),
+          MaterialPageRoute(builder: (context) => StoreManagementScreen(storeId: user.uid)),
         );
       } else {
-        // 신청 기록이 없으면 -> 신청서 작성 화면으로
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const StoreSwitchScreen()),
-        );
+        // 가게가 없으면, 기존 로직대로 입점 신청 상태를 확인합니다.
+        final applicationDoc = await FirebaseFirestore.instance
+            .collection('store_applications')
+            .doc(user.uid)
+            .get();
+
+        if (applicationDoc.exists) {
+          // 신청 기록이 있으면 -> 신청 현황 화면으로
+          final status = applicationDoc.data()?['status'] ?? 'pending';
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ApplicationStatusScreen(status: status, storeId: applicationDoc.id),
+            ),
+          );
+        } else {
+          // 신청 기록도 없으면 -> 신청서 작성 화면으로
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const StoreSwitchScreen()),
+          );
+        }
       }
     }
   }

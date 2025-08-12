@@ -1,7 +1,8 @@
 [
   {
-    "origin": ["http://localhost", "https://*.web.app", "https://*.firebaseapp.com"],
+    "origin": ["https://spotter-8cac4.web.app", "https://spotter-8cac4.firebaseapp.com", "http://localhost:5173"],
     "method": ["GET"],
+    "responseHeader": ["Content-Type"],
     "maxAgeSeconds": 3600
   }
 ]
