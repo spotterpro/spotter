@@ -1,13 +1,17 @@
 // 📁 lib/src/screens/settings_screen.dart
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotter/main.dart';
 import 'package:spotter/services/auth.dart';
-import 'package:spotter/src/screens/edit_profile_screen.dart';
 import 'package:spotter/src/screens/announcements_screen.dart';
+import 'package:spotter/src/screens/application_status_screen.dart';
 import 'package:spotter/src/screens/customer_service_screen.dart';
+import 'package:spotter/src/screens/edit_profile_screen.dart';
 import 'package:spotter/src/screens/store_switch_screen.dart';
+import 'package:spotter/src/screens/terms_and_policies_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final Map<String, dynamic> currentUser;
@@ -45,6 +49,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _saveBoolSetting(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
     prefs.setBool(key, value);
+  }
+
+  // --- 형님의 요청대로 추가된 부분 ---
+  Future<void> _navigateToStoreSwitch() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('store_applications')
+        .doc(user.uid)
+        .get();
+
+    if (mounted) {
+      if (doc.exists) {
+        // 신청 기록이 있으면 -> 신청 현황 화면으로
+        final status = doc.data()?['status'] ?? 'pending';
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ApplicationStatusScreen(status: status),
+          ),
+        );
+      } else {
+        // 신청 기록이 없으면 -> 신청서 작성 화면으로
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const StoreSwitchScreen()),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    await _authService.signOut();
+    if (mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   @override
@@ -104,23 +145,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _buildSettingsItem(context, '고객센터', () {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomerServiceScreen()));
                 }),
+                const Divider(height: 1, indent: 16),
+                _buildSettingsItem(context, '약관 및 정책', () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const TermsAndPoliciesScreen()));
+                }),
               ]
           ),
           const SizedBox(height: 12),
           _buildSection(
               children: [
-                _buildSettingsItem(context, '가게 전환', () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const StoreSwitchScreen()));
-                }),
+                _buildSettingsItem(context, '가게 전환', _navigateToStoreSwitch),
               ]
           ),
           const SizedBox(height: 12),
           ListTile(
             title: const Text('로그아웃', style: TextStyle(color: Colors.red)),
-            onTap: () {
-              _authService.signOut();
-              // 화면 전환은 main.dart의 StreamBuilder가 자동으로 처리합니다.
-            },
+            onTap: _handleLogout,
             tileColor: Theme.of(context).cardColor,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12.0),

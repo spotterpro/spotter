@@ -18,6 +18,11 @@ dependencies:
   cloud_firestore: ^4.17.3
   intl: ^0.19.0
   rxdart: ^0.28.0
+  kakao_map_plugin: ^0.3.7
+  image_picker: ^1.1.2
+  firebase_storage: ^11.7.7
+  dotted_border: ^2.1.0
+  cupertino_icons: ^1.0.2
 
 dev_dependencies:
   flutter_test:

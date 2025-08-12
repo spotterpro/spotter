@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 import 'package:spotter/firebase_options.dart';
 import 'package:spotter/models/user_model.dart';
 import 'package:spotter/src/screens/main_screen.dart';
@@ -14,6 +15,11 @@ ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // --- 형님의 요청대로 수정된 부분 ---
+  // 제공해주신 Javascript 키로 SDK를 초기화하고, 모든 통신을 HTTPS로 강제합니다.
+  AuthRepository.initialize(appKey: '3f7eeaf7f86b376c410316e1280d0bac');
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

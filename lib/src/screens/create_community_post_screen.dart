@@ -151,7 +151,7 @@ class _CreateCommunityPostScreenState extends State<CreateCommunityPostScreen> {
             TextField(
               controller: _captionController,
               decoration: InputDecoration(
-                hintText: '동네 사람들과 나누고 싶은 이야기를 적어보세요.',
+                hintText: '스팟 사람들과 나누고 싶은 이야기를 적어보세요.',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               maxLines: 10,

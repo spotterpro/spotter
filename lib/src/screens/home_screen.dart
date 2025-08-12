@@ -1,5 +1,8 @@
+// 📁 lib/src/screens/home_screen.dart
+
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 import 'package:spotter/src/screens/message_screen.dart';
 import 'package:spotter/src/screens/store_detail_screen.dart';
 import 'package:spotter/src/screens/tour_detail_screen.dart';
@@ -8,13 +11,13 @@ import 'package:spotter/src/widgets/feed_card.dart';
 class HomeScreen extends StatefulWidget {
   final List<Map<String, dynamic>> feedItems;
   final Function(String) onDelete;
-  final Map<String, dynamic> currentUser; // 추가된 부분
+  final Map<String, dynamic> currentUser;
 
   const HomeScreen({
     Key? key,
     required this.feedItems,
     required this.onDelete,
-    required this.currentUser, // 추가된 부분
+    required this.currentUser,
   }) : super(key: key);
 
   @override
@@ -26,6 +29,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<String> _sortOptions = ['거리순', '인기순', '신규오픈순', '혜택많은순'];
   int _selectedTagIndex = 0;
   final List<String> _tags = ['#전체', '#동성로', '#율하', '#수성못', '#앞산', '#세탁', '#파스타맛집'];
+
+  late KakaoMapController mapController;
+  Set<Marker> markers = {};
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +68,33 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             pinned: true,
           ),
-          SliverToBoxAdapter(child: Container(height: 250, color: Colors.grey[800], child: const Center(child: Text('지도 API 연동 예정 구역', style: TextStyle(color: Colors.white, fontSize: 20))))),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 250,
+              child: KakaoMap(
+                onMapCreated: ((controller) {
+                  mapController = controller;
+
+                  // --- 형님의 요청대로 수정된 부분 ---
+                  // 지도가 완전히 준비된 후에 마커를 추가합니다.
+                  setState(() {
+                    markers.add(Marker(
+                      markerId: 'pasta_spot',
+                      latLng: LatLng(35.8694, 128.5985),
+                      infoWindowContent: '<div style="padding:5px; font-size:12px;">맛집 파스타</div>',
+                    ));
+                    markers.add(Marker(
+                      markerId: 'cafe_spot',
+                      latLng: LatLng(35.8721, 128.6055),
+                      infoWindowContent: '<div style="padding:5px; font-size:12px;">카페 스프링</div>',
+                    ));
+                  });
+                }),
+                markers: markers.toList(),
+                center: LatLng(35.8714, 128.6014),
+              ),
+            ),
+          ),
           _buildSectionHeader("🔥 지금 뜨는 스팟 추천"),
           SliverToBoxAdapter(child: _buildTrendingSpotsList(context)),
           SliverToBoxAdapter(child: _BannerCarousel()),
@@ -94,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
           key: ValueKey(item['id']),
           item: item,
           onDelete: () => widget.onDelete(item['id'] as String),
-          currentUser: widget.currentUser, // 수정된 부분
+          currentUser: widget.currentUser,
         );
       },
     );
