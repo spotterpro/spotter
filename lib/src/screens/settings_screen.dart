@@ -1,4 +1,4 @@
-// 📁 lib/src/screens/settings_screen.dart
+// 📁 lib/src/screens/settings_screen.dart (진짜 최종 수정본)
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,7 +10,7 @@ import 'package:spotter/src/screens/announcements_screen.dart';
 import 'package:spotter/src/screens/application_status_screen.dart';
 import 'package:spotter/src/screens/customer_service_screen.dart';
 import 'package:spotter/src/screens/edit_profile_screen.dart';
-import 'package:spotter/src/screens/owner/store_management_screen.dart'; // 👑 추가된 부분
+import 'package:spotter/src/screens/owner/store_owner_main_screen.dart';
 import 'package:spotter/src/screens/store_switch_screen.dart';
 import 'package:spotter/src/screens/terms_and_policies_screen.dart';
 
@@ -29,6 +29,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  // ...(initState 등 다른 코드는 모두 동일)...
   bool _notificationsEnabled = true;
   bool _isDarkMode = false;
   final AuthService _authService = AuthService();
@@ -52,30 +53,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     prefs.setBool(key, value);
   }
 
-  // --- 👑 형님의 요청대로 전면 수정된 부분 ---
+
   Future<void> _navigateToStoreSwitch() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // 1. 이미 등록된 가게가 있는지 먼저 확인합니다.
     final storeDoc = await FirebaseFirestore.instance.collection('stores').doc(user.uid).get();
 
+    // 🔥🔥🔥 --- 바로 이 부분입니다, 형님! --- 🔥🔥🔥
+    // 가게 문서가 존재하고, "NFC 등록 완료" 도장이 찍혀있는지 함께 확인합니다.
     if (mounted) {
-      if (storeDoc.exists) {
-        // 가게가 존재하면, 바로 가게 관리 대시보드로 이동합니다.
+      if (storeDoc.exists && storeDoc.data()?['nfcEnabled'] == true) {
+        // 모든 조건 충족 시, 가게 모드로 바로 진입
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => StoreManagementScreen(storeId: user.uid)),
+          MaterialPageRoute(builder: (context) => StoreOwnerMainScreen(storeId: user.uid)),
         );
       } else {
-        // 가게가 없으면, 기존 로직대로 입점 신청 상태를 확인합니다.
+        // 하나라도 충족하지 못하면, 신청/등록 절차 진행
         final applicationDoc = await FirebaseFirestore.instance
             .collection('store_applications')
             .doc(user.uid)
             .get();
 
         if (applicationDoc.exists) {
-          // 신청 기록이 있으면 -> 신청 현황 화면으로
           final status = applicationDoc.data()?['status'] ?? 'pending';
           Navigator.push(
             context,
@@ -84,7 +85,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           );
         } else {
-          // 신청 기록도 없으면 -> 신청서 작성 화면으로
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const StoreSwitchScreen()),
@@ -101,6 +101,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  // ...(build 메소드 등 이하 모든 코드는 기존과 동일)...
   @override
   Widget build(BuildContext context) {
     return Scaffold(
