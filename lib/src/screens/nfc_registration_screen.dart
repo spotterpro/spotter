@@ -1,4 +1,4 @@
-// 📁 lib/src/screens/nfc_registration_screen.dart
+// 📁 lib/src/screens/nfc_registration_screen.dart (최종 수정본)
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -6,11 +6,11 @@ import 'package:nfc_manager/nfc_manager.dart';
 import 'package:spotter/src/screens/owner/store_management_screen.dart';
 
 class NfcRegistrationScreen extends StatefulWidget {
-  final String storeId;
+  final String applicationId;
 
   const NfcRegistrationScreen({
     super.key,
-    required this.storeId,
+    required this.applicationId,
   });
 
   @override
@@ -57,36 +57,21 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
 
           _updateStatus('태그 감지 완료! 데이터베이스 확인 중...', Icons.wifi_tethering, Colors.blue);
 
-          final existingTag = await FirebaseFirestore.instance.collection('nfc_tags').doc(tagId).get();
+          final appDocRef = FirebaseFirestore.instance.collection('store_applications').doc(widget.applicationId);
+          final existingTag = await appDocRef.collection('nfc_tags').doc(tagId).get();
 
-          // 👑 --- 형님의 지시대로 재스캔 로직을 추가한 부분 --- 👑
           if (existingTag.exists) {
-            final existingStoreId = existingTag.data()?['storeId'];
-            if (existingStoreId == widget.storeId) {
-              // 이미 내 가게에 등록된 태그: 성공으로 간주하고 동기화 메시지 표시
-              _updateStatus('이미 등록된 스티커입니다. 다시 한번 동기화했습니다.', Icons.check_circle, Colors.green, isComplete: true);
-              await NfcManager.instance.stopSession();
-              return;
-            } else {
-              // 다른 가게에 등록된 태그: 에러 처리
-              _updateStatus('이미 다른 가게에 등록된 NFC입니다.', Icons.error, Colors.red);
-              await NfcManager.instance.stopSession();
-              return;
-            }
+            _updateStatus('이미 이 가게에 등록된 스티커입니다.', Icons.check_circle, Colors.green, isComplete: true);
+            await NfcManager.instance.stopSession();
+            return;
           }
 
-          // 새 태그 등록 절차 진행
           _updateStatus('데이터베이스에 등록 중...', Icons.wifi_tethering, Colors.blue);
 
-          await FirebaseFirestore.instance.collection('nfc_tags').doc(tagId).set({
-            'storeId': widget.storeId,
-            'createdAt': FieldValue.serverTimestamp(),
+          await appDocRef.collection('nfc_tags').doc(tagId).set({
+            'uid': tagId,
+            'registeredAt': FieldValue.serverTimestamp(),
             'isActive': true,
-          });
-
-          await FirebaseFirestore.instance.collection('stores').doc(widget.storeId).update({
-            'nfcEnabled': true,
-            'nfcTagId': tagId,
           });
 
           await NfcManager.instance.stopSession();
@@ -137,12 +122,15 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
               const SizedBox(height: 32),
               if (_isRegistrationComplete)
                 ElevatedButton(
+                  // 🔥🔥🔥 --- 바로 이 부분입니다, 형님! --- 🔥🔥🔥
+                  // 'pop' 대신 'pushAndRemoveUntil'을 사용하여 모든 이전 화면을 닫고
+                  // 가게 관리 대시보드로 한번에 이동시킵니다.
                   onPressed: () {
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
-                        builder: (context) => StoreManagementScreen(storeId: widget.storeId),
+                        builder: (context) => StoreManagementScreen(storeId: widget.applicationId),
                       ),
-                          (route) => route.isFirst,
+                          (route) => route.isFirst, // 가장 첫 화면(MainScreen)만 남기고 모두 제거
                     );
                   },
                   style: ElevatedButton.styleFrom(

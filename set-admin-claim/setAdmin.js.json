@@ -1,0 +1,25 @@
+// 📜 setAdmin.js
+
+const admin = require('firebase-admin');
+
+// 1. 다운로드한 서비스 계정 키 파일 경로를 정확하게 입력합니다.
+const serviceAccount = require('./spotter-8cac4-firebase-adminsdk-xxxxx-xxxxxxxxxx.json'); // 👈 형님의 실제 .json 파일명으로 변경해주세요.
+
+admin.initializeApp({
+credential: admin.credential.cert(serviceAccount)
+});
+
+// 2. 관리자로 지정할 사용자의 UID를 입력합니다.
+const uid = 'WrQZMM6UGra8SL6vjs61UQnb5dZ2';
+
+// 3. 해당 사용자에게 `isAdmin: true` 라는 커스텀 클레임을 설정합니다.
+admin.auth().setCustomUserClaims(uid, { isAdmin: true })
+.then(() => {
+console.log(`성공! ${uid} 사용자에게 관리자 권한이 부여되었습니다.`);
+console.log('이제 해당 사용자가 다시 로그인하면 토큰에 관리자 권한이 포함됩니다.');
+process.exit(0);
+})
+.catch((error) => {
+console.error('관리자 권한 부여 실패:', error);
+process.exit(1);
+});
