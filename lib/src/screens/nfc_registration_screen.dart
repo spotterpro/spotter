@@ -3,7 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:nfc_manager/nfc_manager.dart';
-import 'package:spotter/src/screens/owner/store_management_screen.dart'; // 👑 추가된 부분
+import 'package:spotter/src/screens/owner/store_management_screen.dart';
 
 class NfcRegistrationScreen extends StatefulWidget {
   final String storeId;
@@ -55,14 +55,28 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
           final identifier = tag.data['ndef']['identifier'];
           final tagId = identifier.map((e) => e.toRadixString(16).padLeft(2, '0')).join('');
 
-          _updateStatus('태그 감지 완료! 데이터베이스에 등록 중...', Icons.wifi_tethering, Colors.blue);
+          _updateStatus('태그 감지 완료! 데이터베이스 확인 중...', Icons.wifi_tethering, Colors.blue);
 
           final existingTag = await FirebaseFirestore.instance.collection('nfc_tags').doc(tagId).get();
+
+          // 👑 --- 형님의 지시대로 재스캔 로직을 추가한 부분 --- 👑
           if (existingTag.exists) {
-            _updateStatus('이미 다른 가게에 등록된 스티커입니다.', Icons.error, Colors.red);
-            await NfcManager.instance.stopSession();
-            return;
+            final existingStoreId = existingTag.data()?['storeId'];
+            if (existingStoreId == widget.storeId) {
+              // 이미 내 가게에 등록된 태그: 성공으로 간주하고 동기화 메시지 표시
+              _updateStatus('이미 등록된 스티커입니다. 다시 한번 동기화했습니다.', Icons.check_circle, Colors.green, isComplete: true);
+              await NfcManager.instance.stopSession();
+              return;
+            } else {
+              // 다른 가게에 등록된 태그: 에러 처리
+              _updateStatus('이미 다른 가게에 등록된 NFC입니다.', Icons.error, Colors.red);
+              await NfcManager.instance.stopSession();
+              return;
+            }
           }
+
+          // 새 태그 등록 절차 진행
+          _updateStatus('데이터베이스에 등록 중...', Icons.wifi_tethering, Colors.blue);
 
           await FirebaseFirestore.instance.collection('nfc_tags').doc(tagId).set({
             'storeId': widget.storeId,
@@ -76,7 +90,7 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
           });
 
           await NfcManager.instance.stopSession();
-          _updateStatus('NFC 스티커가 가게에 성공적으로 등록되었습니다!', Icons.check_circle, Colors.green, isComplete: true);
+          _updateStatus('NFC가 가게에 성공적으로 등록되었습니다!', Icons.check_circle, Colors.green, isComplete: true);
 
         } catch (e) {
           await NfcManager.instance.stopSession();
@@ -87,7 +101,7 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
         _updateStatus('NFC 스캔 오류: ${e.message}', Icons.error, Colors.red);
       },
     );
-    _updateStatus('NFC 스티커를 휴대폰 뒷면에 태그해주세요.', Icons.nfc, Colors.blue);
+    _updateStatus('NFC를 휴대폰 뒷면에 태그해주세요.', Icons.nfc, Colors.blue);
   }
 
   void _updateStatus(String message, IconData icon, Color color, {bool isComplete = false}) {
@@ -105,7 +119,7 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NFC 스티커 등록'),
+        title: const Text('NFC 등록'),
       ),
       body: Center(
         child: Padding(
@@ -123,14 +137,12 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
               const SizedBox(height: 32),
               if (_isRegistrationComplete)
                 ElevatedButton(
-                  // --- 형님의 요청대로 수정된 부분 ---
                   onPressed: () {
-                    // 이전 화면들을 모두 제거하고 가게 관리 화면으로 이동합니다.
                     Navigator.of(context).pushAndRemoveUntil(
                       MaterialPageRoute(
                         builder: (context) => StoreManagementScreen(storeId: widget.storeId),
                       ),
-                          (route) => route.isFirst, // MainScreen만 남기고 모두 제거
+                          (route) => route.isFirst,
                     );
                   },
                   style: ElevatedButton.styleFrom(
@@ -140,7 +152,7 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
                 )
               else if (_scanStatus.contains('태그해주세요'))
                 Text(
-                  '스티커가 인식되면 자동으로 등록이 완료됩니다.',
+                  'NFC가 인식되면 자동으로 등록이 완료됩니다.',
                   style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                   textAlign: TextAlign.center,
                 ),

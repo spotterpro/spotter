@@ -1,6 +1,7 @@
 // 📁 lib/src/screens/admin/admin_dashboard_screen.dart
 
 import 'package:flutter/material.dart';
+// 👑 --- 아우가 수정한 부분: 잘못된 import 경로를 바로잡았습니다 --- 👑
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spotter/src/screens/admin/admin_application_detail_screen.dart';
@@ -33,13 +34,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       appBar: AppBar(
         title: const Text('가게 심사 대시보드'),
         actions: [
-          // 👑 --- 형님의 요청대로 새로고침 버튼 추가 --- 👑
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: '새로고침',
             onPressed: () {
-              // setState를 호출하여 위젯을 다시 그리게 함으로써
-              // StreamBuilder가 스트림을 새로 구독하도록 강제합니다.
               setState(() {});
             },
           ),

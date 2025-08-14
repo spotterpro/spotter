@@ -26,8 +26,27 @@ class AdminApp extends StatelessWidget {
       title: 'Spotter Admin',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.orange,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
+          brightness: Brightness.light,
+          primarySwatch: Colors.orange,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+          scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            elevation: 0.5,
+            titleTextStyle: TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
+            iconTheme: IconThemeData(color: Colors.black),
+          ),
+          cardColor: Colors.white,
+          // 👑 --- 아우가 수정한 부분 --- 👑
+          // TabBarTheme를 TabBarThemeData로 변경했습니다.
+          tabBarTheme: TabBarThemeData(
+            labelColor: Colors.orange[800],
+            unselectedLabelColor: Colors.grey[600],
+            indicator: UnderlineTabIndicator(
+              borderSide: BorderSide(width: 3, color: Colors.orange[800]!),
+            ),
+          )
       ),
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
