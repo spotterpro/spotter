@@ -1,15 +1,17 @@
-// 📁 lib/src/screens/owner/dashboard_screen.dart (디자인 최종 수정본)
+// 📁 lib/src/screens/owner/dashboard_screen.dart (뒤로가기 버튼 제거 최종본)
 
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:spotter/models/user_model.dart';
 import 'package:spotter/services/mode_prefs.dart';
 import 'package:spotter/src/screens/app_decider.dart';
+import 'package:spotter/src/screens/owner/trend_analysis_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   final String storeId;
-
   const DashboardScreen({super.key, required this.storeId});
 
   Future<void> _exitToUserMode(BuildContext context) async {
@@ -29,28 +31,55 @@ class DashboardScreen extends StatelessWidget {
     }
   }
 
+  Map<String, DateTime> _getTodayRange() {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    return {'start': startOfDay, 'end': endOfDay};
+  }
+
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('stores').doc(storeId).snapshots(),
+    final todayRange = _getTodayRange();
+
+    return StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('stores')
+            .doc(storeId)
+            .collection('visits')
+            .where('timestamp', isGreaterThanOrEqualTo: todayRange['start'])
+            .where('timestamp', isLessThan: todayRange['end'])
+            .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
-          if (!snapshot.hasData || !snapshot.data!.exists) {
-            return Scaffold(
-              appBar: AppBar(title: const Text('오류')),
-              body: const Center(child: Text('가게 정보를 불러올 수 없습니다.')),
-            );
+          if (snapshot.hasError) {
+            return Scaffold(appBar: AppBar(title: const Text("오류")), body: Center(child: Text('데이터를 불러오는 중 오류가 발생했습니다: ${snapshot.error}')));
           }
 
-          final storeData = snapshot.data!.data() as Map<String, dynamic>;
-          // 🔥 1번 지시사항: AppBar 제목을 '사장님 대시보드'로 고정
-          final storeName = storeData['storeName'] ?? '가게';
+          final visitDocs = snapshot.data?.docs ?? [];
+          final newVisitorsToday = visitDocs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>?;
+            return data?['isFirstVisit'] == true;
+          }).length;
+
+          final totalVisitorsToday = visitDocs.length;
+          final returningVisitorsToday = totalVisitorsToday - newVisitorsToday;
+          final revisitRate = totalVisitorsToday == 0 ? 0.0 : (returningVisitorsToday / totalVisitorsToday) * 100;
+
+          String returningChange = returningVisitorsToday > 0 ? "+$returningVisitorsToday" : "+0";
+          Color returningChangeColor = returningVisitorsToday > 0 ? Colors.green : Colors.grey;
+          String newChange = newVisitorsToday > 0 ? "+$newVisitorsToday" : "+0";
+          Color newChangeColor = newVisitorsToday > 0 ? Colors.green : Colors.grey;
+          String revisitChange = revisitRate > 0 ? "+${revisitRate.toStringAsFixed(0)}%" : "+0%";
+          Color revisitChangeColor = revisitRate > 0 ? Colors.green : Colors.grey;
 
           return Scaffold(
             appBar: AppBar(
-              title: Text('$storeName 대시보드'), // AppBar 제목 수정
+              // 🔥🔥🔥 --- 바로 이 부분입니다, 형님! --- 🔥🔥🔥
+              automaticallyImplyLeading: false, // 뒤로가기 버튼을 제거합니다.
+              title: const Text('사장님 대시보드'),    // 제목을 고정합니다.
               actions: [
                 IconButton(
                   icon: const Icon(Icons.exit_to_app),
@@ -66,44 +95,51 @@ class DashboardScreen extends StatelessWidget {
                 children: [
                   _buildSectionTitle('실시간 현황'),
                   const SizedBox(height: 16),
-
                   _StatusCard(
                     title: '현재 방문자',
-                    value: '12',
+                    value: '$returningVisitorsToday',
                     unit: '명',
-                    change: '+3',
-                    changeColor: Colors.green,
+                    change: returningChange,
+                    changeColor: returningChangeColor,
                   ),
                   const SizedBox(height: 12),
                   _StatusCard(
                     title: '오늘 신규 고객',
-                    value: '4',
+                    value: '$newVisitorsToday',
                     unit: '명',
-                    change: '25%',
+                    change: newChange,
+                    changeColor: newChangeColor,
                   ),
                   const SizedBox(height: 12),
                   _StatusCard(
                     title: '실시간 재방문율',
-                    value: '68',
+                    value: revisitRate.toStringAsFixed(0),
                     unit: '%',
-                    change: '+5%p',
-                    changeColor: Colors.green,
+                    change: revisitChange,
+                    changeColor: revisitChangeColor,
                   ),
                   const SizedBox(height: 12),
-                  _StatusCard(
-                    title: 'Spotter 참여 시간',
-                    value: '25일 10시간 30분',
-                    isPremium: true,
-                  ),
+                  const _RemainingTimeCard(),
 
                   const SizedBox(height: 32),
-                  _buildSectionTitle('트렌드 분석', showDetails: true),
+                  _buildSectionTitle(
+                      '트렌드 분석',
+                      showDetails: true,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => TrendAnalysisScreen(storeId: storeId)),
+                        );
+                      }
+                  ),
                   const SizedBox(height: 16),
-                  _buildChartCard(context),
+                  _buildChartCard(context, storeId),
+
                   const SizedBox(height: 32),
                   _buildSectionTitle('고객 세분화'),
                   const SizedBox(height: 16),
-                  _buildCustomerSegmentCard(context),
+                  _buildCustomerSegmentCard(context, newVisitors: newVisitorsToday),
+
                   const SizedBox(height: 32),
                   _buildSectionTitle('마케팅 효과'),
                   const SizedBox(height: 16),
@@ -116,8 +152,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  // 🔥 2번 지시사항: 모든 섹션 제목에 동일한 스타일이 적용되도록 함수화
-  Widget _buildSectionTitle(String title, {bool showDetails = false}) {
+  Widget _buildSectionTitle(String title, {bool showDetails = false, VoidCallback? onTap}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -138,13 +173,19 @@ class DashboardScreen extends StatelessWidget {
           ],
         ),
         if (showDetails)
-          Text('자세히', style: TextStyle(color: Colors.orange[700], fontSize: 14, fontWeight: FontWeight.bold)),
+          InkWell(
+            onTap: onTap,
+            child: Text('자세히', style: TextStyle(color: Colors.orange[700], fontSize: 14, fontWeight: FontWeight.bold)),
+          ),
       ],
     );
   }
 
-  Widget _buildChartCard(BuildContext context) {
-    //...(이하 생략)...
+  Widget _buildChartCard(BuildContext context, String storeId) {
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfWeekDate = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -158,12 +199,31 @@ class DashboardScreen extends StatelessWidget {
           children: [
             const Text('주간 방문자 변화', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            Container(
-              height: 150,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(child: Image.network('https://i.imgur.com/2Y82k9H.png', fit: BoxFit.contain)),
+            StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('stores')
+                  .doc(storeId)
+                  .collection('visits')
+                  .where('timestamp', isGreaterThanOrEqualTo: startOfWeekDate)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return SizedBox(height: 150, child: _WeeklyVisitorChart(weeklyData: List.filled(7, 0)));
+                }
+
+                final visits = snapshot.data!.docs;
+                final weeklyData = List.filled(7, 0);
+                for (var visit in visits) {
+                  final data = visit.data() as Map<String, dynamic>;
+                  final timestamp = (data['timestamp'] as Timestamp).toDate();
+                  weeklyData[timestamp.weekday - 1]++;
+                }
+
+                return SizedBox(height: 150, child: _WeeklyVisitorChart(weeklyData: weeklyData));
+              },
             ),
           ],
         ),
@@ -171,7 +231,7 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCustomerSegmentCard(BuildContext context) {
+  Widget _buildCustomerSegmentCard(BuildContext context, {required int newVisitors}) {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -185,17 +245,17 @@ class DashboardScreen extends StatelessWidget {
           children: [
             const Text('고객 세분화', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 20),
-            _Segment(icon: Icons.diamond, color: Colors.red, label: 'VIP (주 3회+)', value: '15명'),
+            _Segment(icon: Icons.diamond, color: Colors.red, label: 'VIP (주 3회+)', value: '0명'),
             const SizedBox(height: 16),
-            _Segment(icon: Icons.star, color: Colors.orange, label: '일반 (주 1-2회)', value: '48명'),
+            _Segment(icon: Icons.star, color: Colors.orange, label: '일반 (주 1-2회)', value: '0명'),
             const SizedBox(height: 16),
-            _Segment(icon: Icons.lightbulb, color: Colors.green, label: '신규 (첫 방문)', value: '22명'),
+            _Segment(icon: Icons.lightbulb, color: Colors.green, label: '신규 (첫 방문)', value: '$newVisitors명'),
             const Divider(height: 28),
             const Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('충성고객 이탈 위험', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('3명', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                Text('0명', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
               ],
             )
           ],
@@ -218,10 +278,10 @@ class DashboardScreen extends StatelessWidget {
           children: [
             const Text('마케팅 효과', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            _MarketingStat(title: '리워드 후 재방문율', value: '+15%', changeColor: Colors.green),
-            _MarketingStat(title: '이벤트 방문자 수', value: '+40%', changeColor: Colors.green),
-            _MarketingStat(title: '투어 완주자 수', value: '5명'),
-            _MarketingStat(title: '누적 방문 수', value: '1,234회'),
+            _MarketingStat(title: '리워드 후 재방문율', value: '+0%', changeColor: Colors.grey),
+            _MarketingStat(title: '이벤트 방문자 수', value: '0명'),
+            _MarketingStat(title: '투어 완주자 수', value: '0명'),
+            _MarketingStat(title: '누적 방문 수', value: '0회'),
           ],
         ),
       ),
@@ -229,7 +289,59 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-// 🔥 3번 지시사항: '실시간 현황' 카드 UI를 지시대로 수정
+class _RemainingTimeCard extends StatefulWidget {
+  const _RemainingTimeCard();
+
+  @override
+  State<_RemainingTimeCard> createState() => _RemainingTimeCardState();
+}
+
+class _RemainingTimeCardState extends State<_RemainingTimeCard> {
+  Timer? _timer;
+  Duration _remainingTime = Duration.zero;
+  final DateTime _expiryDate = DateTime.now().add(const Duration(days: 29, hours: 13, minutes: 45));
+
+  @override
+  void initState() {
+    super.initState();
+    _updateTime();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) => _updateTime());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _updateTime() {
+    if (mounted) {
+      setState(() {
+        _remainingTime = _expiryDate.difference(DateTime.now());
+      });
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    if (duration.isNegative) return "기간 만료";
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    String days = duration.inDays.toString();
+    String hours = twoDigits(duration.inHours.remainder(24));
+    String minutes = twoDigits(duration.inMinutes.remainder(60));
+    String seconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$days일 $hours시간 $minutes분 ${seconds}초";
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _StatusCard(
+      title: '잔여 시간',
+      value: _formatDuration(_remainingTime),
+      isPremium: false,
+    );
+  }
+}
+
 class _StatusCard extends StatelessWidget {
   final String title;
   final String value;
@@ -244,11 +356,13 @@ class _StatusCard extends StatelessWidget {
     this.unit,
     this.change,
     this.changeColor,
-    this.isPremium = false,
+    this.isPremium = true,
   });
 
   @override
   Widget build(BuildContext context) {
+    bool isTimeCard = title == '잔여 시간';
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -260,35 +374,39 @@ class _StatusCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: TextStyle(fontSize: 16, color: Colors.grey[700])),
+            Row(
+              children: [
+                Text(title, style: TextStyle(fontSize: 16, color: Colors.grey[700])),
+                if (isTimeCard) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    'BASIC',
+                    style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ]
+              ],
+            ),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                // 왼쪽: 작은 폰트의 변화량
-                if (change != null)
-                  Text(change!, style: TextStyle(color: changeColor ?? Colors.grey[600], fontSize: 16)),
-                if (isPremium) // 프리미엄 카드는 변화량 대신 공백
-                  const SizedBox(),
-
-                // 오른쪽: 큰 폰트의 주요 수치
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(value, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-                    if (unit != null) const SizedBox(width: 4),
-                    if (unit != null) Text(unit!, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    if (isPremium)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8.0),
-                        child: Text('프리미엄', style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.bold)),
-                      ),
-                  ],
-                ),
+                if (isTimeCard) ...[
+                  Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                ] else ... [
+                  Text(change ?? '', style: TextStyle(color: changeColor ?? Colors.grey[600], fontSize: 16)),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(value, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                      if (unit != null) const SizedBox(width: 4),
+                      if (unit != null) Text(unit!, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ]
               ],
             ),
           ],
@@ -299,7 +417,6 @@ class _StatusCard extends StatelessWidget {
 }
 
 class _Segment extends StatelessWidget {
-//...(이하 생략)...
   final IconData icon;
   final Color color;
   final String label;
@@ -322,7 +439,6 @@ class _Segment extends StatelessWidget {
 }
 
 class _MarketingStat extends StatelessWidget {
-//...(이하 생략)...
   final String title;
   final String value;
   final Color? changeColor;
@@ -337,6 +453,96 @@ class _MarketingStat extends StatelessWidget {
         children: [
           Text(title, style: TextStyle(color: Colors.grey[700])),
           Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: changeColor)),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeeklyVisitorChart extends StatelessWidget {
+  final List<int> weeklyData;
+  const _WeeklyVisitorChart({required this.weeklyData});
+
+  @override
+  Widget build(BuildContext context) {
+    return LineChart(
+      LineChartData(
+        gridData: const FlGridData(show: false),
+        titlesData: FlTitlesData(
+          show: true,
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 30,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                const style = TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.grey
+                );
+                Widget text;
+                switch (value.toInt()) {
+                  case 0:
+                    text = const Text('월', style: style);
+                    break;
+                  case 1:
+                    text = const Text('화', style: style);
+                    break;
+                  case 2:
+                    text = const Text('수', style: style);
+                    break;
+                  case 3:
+                    text = const Text('목', style: style);
+                    break;
+                  case 4:
+                    text = const Text('금', style: style);
+                    break;
+                  case 5:
+                    text = const Text('토', style: style);
+                    break;
+                  case 6:
+                    text = const Text('일', style: style);
+                    break;
+                  default:
+                    text = const Text('', style: style);
+                    break;
+                }
+
+                return SideTitleWidget(
+                  axisSide: meta.axisSide,
+                  child: text,
+                );
+              },
+            ),
+          ),
+          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: false),
+        lineBarsData: [
+          LineChartBarData(
+            spots: weeklyData.asMap().entries.map((e) {
+              return FlSpot(e.key.toDouble(), e.value.toDouble());
+            }).toList(),
+            isCurved: true,
+            color: Colors.orange,
+            barWidth: 4,
+            isStrokeCapRound: true,
+            dotData: const FlDotData(show: false),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                colors: [
+                  Colors.orange.withOpacity(0.3),
+                  Colors.orange.withOpacity(0.0),
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
         ],
       ),
     );
