@@ -1,4 +1,4 @@
-// 📁 lib/src/screens/settings_screen.dart (진짜 최종 수정본)
+// 📁 lib/src/screens/settings_screen.dart (최종 수정본)
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotter/main.dart';
 import 'package:spotter/services/auth.dart';
+import 'package:spotter/services/mode_prefs.dart'; // ModePrefs import
 import 'package:spotter/src/screens/announcements_screen.dart';
 import 'package:spotter/src/screens/application_status_screen.dart';
 import 'package:spotter/src/screens/customer_service_screen.dart';
@@ -54,23 +55,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
 
+  // 🔥🔥🔥 --- 바로 이 부분입니다, 형님! --- 🔥🔥🔥
   Future<void> _navigateToStoreSwitch() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     final storeDoc = await FirebaseFirestore.instance.collection('stores').doc(user.uid).get();
 
-    // 🔥🔥🔥 --- 바로 이 부분입니다, 형님! --- 🔥🔥🔥
-    // 가게 문서가 존재하고, "NFC 등록 완료" 도장이 찍혀있는지 함께 확인합니다.
     if (mounted) {
+      // 1. 가게 문서가 존재하고, NFC 등록까지 완료되었는지 확인
       if (storeDoc.exists && storeDoc.data()?['nfcEnabled'] == true) {
-        // 모든 조건 충족 시, 가게 모드로 바로 진입
+        // 2. '가게 주인 신분증'을 발급합니다.
+        await ModePrefs.setStoreMode(true);
+
+        // 3. 가게 모드 메인 화면으로 이동
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => StoreOwnerMainScreen(storeId: user.uid)),
+          MaterialPageRoute(builder: (context) => StoreOwnerMainScreen(user: user)),
         );
       } else {
-        // 하나라도 충족하지 못하면, 신청/등록 절차 진행
+        // 4. 조건 미충족 시, 기존 신청/등록 절차 진행
         final applicationDoc = await FirebaseFirestore.instance
             .collection('store_applications')
             .doc(user.uid)
@@ -95,6 +99,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _handleLogout() async {
+    // 🔥 로그아웃 시, 신분증을 파기합니다.
+    await ModePrefs.setStoreMode(false);
     await _authService.signOut();
     if (mounted) {
       Navigator.of(context).popUntil((route) => route.isFirst);
