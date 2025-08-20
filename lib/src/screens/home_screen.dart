@@ -1,8 +1,9 @@
-// 📁 lib/src/screens/home_screen.dart
+// 📁 lib/src/screens/home_screen.dart (오타 수정 최종본)
 
 import 'package:flutter/material.dart';
-import 'dart:async';
+import 'dart:async'; // --- 🔥🔥🔥 형님, 이 부분의 오타를 수정했습니다! ---
 import 'package:kakao_map_plugin/kakao_map_plugin.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:spotter/src/screens/message_screen.dart';
 import 'package:spotter/src/screens/store_detail_screen.dart';
 import 'package:spotter/src/screens/tour_detail_screen.dart';
@@ -32,6 +33,52 @@ class _HomeScreenState extends State<HomeScreen> {
 
   late KakaoMapController mapController;
   Set<Marker> markers = {};
+
+  StreamSubscription<QuerySnapshot>? _storeSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // initState에서는 이제 아무것도 호출하지 않습니다.
+  }
+
+  void _startStoreSubscription() {
+    _storeSubscription?.cancel();
+
+    _storeSubscription = FirebaseFirestore.instance
+        .collection('stores')
+        .where('status', isEqualTo: 'approved')
+        .snapshots()
+        .listen((snapshot) {
+
+      final newMarkers = <Marker>{};
+      for (var doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final GeoPoint location = data['location'];
+        final String storeName = data['storeName'] ?? '이름 없는 가게';
+
+        newMarkers.add(Marker(
+          markerId: doc.id,
+          latLng: LatLng(location.latitude, location.longitude),
+          infoWindowContent: '<div style="padding:5px; font-size:12px;">$storeName</div>',
+        ));
+      }
+
+      if (mounted) {
+        setState(() {
+          markers = newMarkers;
+        });
+      }
+    }, onError: (error) {
+      print("가게 정보 실시간 감시 실패: $error");
+    });
+  }
+
+  @override
+  void dispose() {
+    _storeSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,21 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: KakaoMap(
                 onMapCreated: ((controller) {
                   mapController = controller;
-
-                  // --- 형님의 요청대로 수정된 부분 ---
-                  // 지도가 완전히 준비된 후에 마커를 추가합니다.
-                  setState(() {
-                    markers.add(Marker(
-                      markerId: 'pasta_spot',
-                      latLng: LatLng(35.8694, 128.5985),
-                      infoWindowContent: '<div style="padding:5px; font-size:12px;">맛집 파스타</div>',
-                    ));
-                    markers.add(Marker(
-                      markerId: 'cafe_spot',
-                      latLng: LatLng(35.8721, 128.6055),
-                      infoWindowContent: '<div style="padding:5px; font-size:12px;">카페 스프링</div>',
-                    ));
-                  });
+                  _startStoreSubscription();
                 }),
                 markers: markers.toList(),
                 center: LatLng(35.8714, 128.6014),

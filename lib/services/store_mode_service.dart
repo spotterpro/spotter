@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:spotter/services/mode_prefs.dart';
 
 class StoreModeService {
   final String uid;
@@ -10,29 +9,34 @@ class StoreModeService {
 
   StoreModeService({required this.uid});
 
-  // 앱 시작 시, 최종적으로 어떤 모드로 시작할지 결정
-  Future<bool> shouldEnterStoreMode() async {
-    final hasLocalFlag = await ModePrefs.getStoreMode();
-    if (!hasLocalFlag) return false;
+  /// [수정됨] 사용자의 정확한 가게 상태를 문자열로 반환하는 새로운 함수
+  /// 반환값: "approved", "pending", "rejected", "none"
+  Future<String> getStoreStatus() async {
+    if (uid.isEmpty) return 'none';
 
-    // 형님의 DB 구조에 맞게 'stores' 컬렉션을 확인합니다.
     final docRef = FirebaseFirestore.instance.collection('stores').doc(uid);
     final doc = await docRef.get();
 
-    // 문서가 존재하고, nfcEnabled가 true(모든 등록 절차 완료)인지 확인
-    if (doc.exists && doc.data()?['nfcEnabled'] == true) {
-      return true;
+    if (doc.exists) {
+      // 문서가 존재하면 status 필드 값을 반환합니다.
+      return doc.data()?['status'] ?? 'pending'; // status 필드가 없으면 'pending'으로 간주
     } else {
-      await ModePrefs.setStoreMode(false); // 조건 미충족 시 신분증 파기
-      return false;
+      // 문서가 없으면 신청한 적이 없는 것입니다.
+      return 'none';
     }
   }
 
-  // 가게 상태 변경 실시간 감시
+  // 이하는 기존 코드입니다. 지금 당장 사용되지는 않지만 그대로 둡니다.
+  Future<bool> shouldEnterStoreMode() async {
+    final docRef = FirebaseFirestore.instance.collection('stores').doc(uid);
+    final doc = await docRef.get();
+    return doc.exists && doc.data()?['status'] == 'approved';
+  }
+
   void listenForStatusChanges({required Function onDeauthorized}) {
     final docRef = FirebaseFirestore.instance.collection('stores').doc(uid);
     _statusSubscription = docRef.snapshots().listen((doc) {
-      if (!doc.exists || doc.data()?['nfcEnabled'] != true) {
+      if (!doc.exists || doc.data()?['status'] != 'approved') {
         onDeauthorized();
       }
     });

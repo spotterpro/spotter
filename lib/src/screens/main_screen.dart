@@ -25,8 +25,6 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  // --- 형님의 요청대로 수정된 부분 ---
-  // HomeScreen이 아직 로컬 데이터를 사용하므로, 임시 데이터와 삭제 함수를 복구했습니다.
   late List<Map<String, dynamic>> _allFeedItems;
 
   @override
@@ -53,7 +51,6 @@ class _MainScreenState extends State<MainScreen> {
     ];
   }
 
-  // HomeScreen의 FeedCard에서 사용할 삭제 함수를 복구합니다.
   void _deleteFeedItem(String id) {
     setState(() {
       _allFeedItems.removeWhere((item) => item['id'] == id);
@@ -73,11 +70,11 @@ class _MainScreenState extends State<MainScreen> {
       HomeScreen(
         feedItems: _allFeedItems,
         onDelete: _deleteFeedItem,
-        currentUser: currentUserMap, // 수정된 부분
+        currentUser: currentUserMap,
       ),
       CommunityScreen(currentUser: currentUserMap),
-      UploadFeedScreen(currentUser: currentUserMap),
       const StampScreen(),
+      UploadFeedScreen(currentUser: currentUserMap),
       MyPageScreen(
         currentUserProfile: widget.currentUserProfile,
         onProfileUpdated: _updateProfile,
@@ -90,12 +87,44 @@ class _MainScreenState extends State<MainScreen> {
         children: pages,
       ),
       bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: '홈'),
-          BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people), label: '커뮤니티'),
-          BottomNavigationBarItem(icon: Icon(Icons.add_box_outlined), activeIcon: Icon(Icons.add_box), label: '피드작성'),
-          BottomNavigationBarItem(icon: FaIcon(FontAwesomeIcons.stamp), activeIcon: FaIcon(FontAwesomeIcons.stamp), label: '스탬프'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: '마이페이지'),
+        items: <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home, color: Colors.orange[600]),
+            label: '홈',
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.people_outline),
+            activeIcon: Icon(Icons.people, color: Colors.orange[600]),
+            label: '커뮤니티',
+          ),
+          // --- 형님 지시대로 재수정된 부분 ---
+          BottomNavigationBarItem(
+            icon: const FaIcon(FontAwesomeIcons.stamp),
+            activeIcon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange[600], // 시그니처 배경색
+                shape: BoxShape.circle,
+              ),
+              child: const FaIcon(
+                FontAwesomeIcons.stamp,
+                color: Colors.white, // 대비되는 아이콘 색상
+                size: 20, // 아이콘 크기 조정
+              ),
+            ),
+            label: '스탬프',
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.add_box_outlined),
+            activeIcon: Icon(Icons.add_box, color: Colors.orange[600]),
+            label: '피드작성',
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person, color: Colors.orange[600]),
+            label: '마이페이지',
+          ),
         ],
         currentIndex: _selectedIndex,
         onTap: (index) {
@@ -103,7 +132,6 @@ class _MainScreenState extends State<MainScreen> {
             _selectedIndex = index;
           });
         },
-        selectedItemColor: Colors.orange[600],
         unselectedItemColor: Colors.grey[600],
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: true,

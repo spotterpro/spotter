@@ -1,18 +1,15 @@
-// 📁 lib/src/screens/settings_screen.dart (최종 수정본)
+// 📁 lib/src/screens/settings_screen.dart
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotter/main.dart';
 import 'package:spotter/services/auth.dart';
-import 'package:spotter/services/mode_prefs.dart'; // ModePrefs import
+import 'package:spotter/services/mode_prefs.dart';
 import 'package:spotter/src/screens/announcements_screen.dart';
-import 'package:spotter/src/screens/application_status_screen.dart';
 import 'package:spotter/src/screens/customer_service_screen.dart';
 import 'package:spotter/src/screens/edit_profile_screen.dart';
-import 'package:spotter/src/screens/owner/store_owner_main_screen.dart';
-import 'package:spotter/src/screens/store_switch_screen.dart';
+import 'package:spotter/src/screens/store_mode_router.dart';
 import 'package:spotter/src/screens/terms_and_policies_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -30,7 +27,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // ...(initState 등 다른 코드는 모두 동일)...
   bool _notificationsEnabled = true;
   bool _isDarkMode = false;
   final AuthService _authService = AuthService();
@@ -51,139 +47,121 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _saveBoolSetting(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    prefs.setBool(key, value);
-  }
-
-
-  // 🔥🔥🔥 --- 바로 이 부분입니다, 형님! --- 🔥🔥🔥
-  Future<void> _navigateToStoreSwitch() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    final storeDoc = await FirebaseFirestore.instance.collection('stores').doc(user.uid).get();
-
-    if (mounted) {
-      // 1. 가게 문서가 존재하고, NFC 등록까지 완료되었는지 확인
-      if (storeDoc.exists && storeDoc.data()?['nfcEnabled'] == true) {
-        // 2. '가게 주인 신분증'을 발급합니다.
-        await ModePrefs.setStoreMode(true);
-
-        // 3. 가게 모드 메인 화면으로 이동
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => StoreOwnerMainScreen(user: user)),
-        );
-      } else {
-        // 4. 조건 미충족 시, 기존 신청/등록 절차 진행
-        final applicationDoc = await FirebaseFirestore.instance
-            .collection('store_applications')
-            .doc(user.uid)
-            .get();
-
-        if (applicationDoc.exists) {
-          final status = applicationDoc.data()?['status'] ?? 'pending';
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ApplicationStatusScreen(status: status, storeId: applicationDoc.id),
-            ),
-          );
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const StoreSwitchScreen()),
-          );
-        }
-      }
-    }
+    await prefs.setBool(key, value);
   }
 
   Future<void> _handleLogout() async {
-    // 🔥 로그아웃 시, 신분증을 파기합니다.
     await ModePrefs.setStoreMode(false);
     await _authService.signOut();
-    if (mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    }
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
-  // ...(build 메소드 등 이하 모든 코드는 기존과 동일)...
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('설정'),
-      ),
+      appBar: AppBar(title: const Text('설정')),
       body: ListView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         children: [
-          _buildSection(
-            children: [
-              SwitchListTile(
-                title: const Text('알림 설정'),
-                value: _notificationsEnabled,
-                onChanged: (bool value) {
-                  setState(() { _notificationsEnabled = value; });
-                  _saveBoolSetting('notificationsEnabled', value);
-                },
-                activeColor: Colors.orange[400],
+          // 🔔 알림 토글
+          _card(
+            child: SwitchListTile(
+              title: const Text('알림 설정'),
+              value: _notificationsEnabled,
+              onChanged: (v) {
+                setState(() => _notificationsEnabled = v);
+                _saveBoolSetting('notificationsEnabled', v);
+              },
+              activeColor: Colors.orange[400],
+            ),
+          ),
+
+          // 🌙 다크 모드
+          _card(
+            child: SwitchListTile(
+              title: const Text('다크 모드'),
+              value: _isDarkMode,
+              onChanged: (v) {
+                setState(() => _isDarkMode = v);
+                _saveBoolSetting('isDarkMode', v);
+                themeNotifier.value = v ? ThemeMode.dark : ThemeMode.light;
+              },
+              activeColor: Colors.orange[400],
+            ),
+          ),
+
+          // 👤 계정 관리
+          _card(
+            child: _listTile(
+              '계정 관리',
+                  () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => EditProfileScreen(
+                      currentNickname: widget.currentUser['userName'],
+                      currentBio: widget.currentUser['bio'],
+                    ),
+                  ),
+                );
+                if (result != null && result is Map<String, String>) {
+                  widget.onProfileUpdated(result);
+                }
+              },
+            ),
+          ),
+
+          // 📢 공지사항
+          _card(
+            child: _listTile(
+              '공지사항',
+                  () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AnnouncementsScreen()),
               ),
-              const Divider(height: 1, indent: 16),
-              SwitchListTile(
-                title: const Text('다크 모드'),
-                value: _isDarkMode,
-                onChanged: (bool value) {
-                  setState(() { _isDarkMode = value; });
-                  _saveBoolSetting('isDarkMode', value);
-                  themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
-                },
-                activeColor: Colors.orange[400],
+            ),
+          ),
+
+          // ☎️ 고객센터
+          _card(
+            child: _listTile(
+              '고객센터',
+                  () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CustomerServiceScreen()),
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
-          _buildSection(
-              children: [
-                _buildSettingsItem(context, '계정 관리', () async {
-                  final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => EditProfileScreen(
-                    currentNickname: widget.currentUser['userName'],
-                    currentBio: widget.currentUser['bio'],
-                  )));
-                  if (result != null && result is Map<String, String>) {
-                    widget.onProfileUpdated(result);
-                  }
-                }),
-              ]
+
+          // 📑 약관 및 정책
+          _card(
+            child: _listTile(
+              '약관 및 정책',
+                  () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TermsAndPoliciesScreen()),
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
-          _buildSection(
-              children: [
-                _buildSettingsItem(context, '공지사항', () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const AnnouncementsScreen()));
-                }),
-                const Divider(height: 1, indent: 16),
-                _buildSettingsItem(context, '고객센터', () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const CustomerServiceScreen()));
-                }),
-                const Divider(height: 1, indent: 16),
-                _buildSettingsItem(context, '약관 및 정책', () {
-                  Navigator.push(context, MaterialPageRoute(builder: (context) => const TermsAndPoliciesScreen()));
-                }),
-              ]
+
+          // 🏪 가게 전환
+          _card(
+            child: _listTile(
+              '가게 전환',
+                  () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const StoreModeRouter())
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
-          _buildSection(
-              children: [
-                _buildSettingsItem(context, '가게 전환', _navigateToStoreSwitch),
-              ]
-          ),
-          const SizedBox(height: 12),
-          ListTile(
-            title: const Text('로그아웃', style: TextStyle(color: Colors.red)),
-            onTap: _handleLogout,
-            tileColor: Theme.of(context).cardColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12.0),
+
+          // 🚪 로그아웃
+          _card(
+            child: ListTile(
+              title: const Text('로그아웃', style: TextStyle(color: Colors.red)),
+              trailing: const Icon(Icons.chevron_right, color: Colors.red),
+              onTap: _handleLogout,
             ),
           ),
         ],
@@ -191,23 +169,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSection({required List<Widget> children}) {
+  /// 단일 아이템용 카드 래퍼 (라운드 + 옅은 테두리 + 리플)
+  Widget _card({required Widget child}) {
     return Container(
-      decoration: BoxDecoration(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Material(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(12.0),
-      ),
-      child: Column(
-        children: children,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: Theme.of(context).dividerColor.withOpacity(0.15),
+            width: 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias, // 리플이 둥근 모양 안에서만 보이도록
+        child: child,
       ),
     );
   }
 
-  Widget _buildSettingsItem(BuildContext context, String title, VoidCallback onTap) {
+  /// 우측 화살표 기본 항목
+  Widget _listTile(String title, VoidCallback onTap) {
     return ListTile(
       title: Text(title),
       trailing: const Icon(Icons.chevron_right, color: Colors.grey),
       onTap: onTap,
+      dense: false,
+      visualDensity: const VisualDensity(vertical: 0),
     );
   }
 }

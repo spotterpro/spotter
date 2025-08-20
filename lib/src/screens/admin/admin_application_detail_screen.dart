@@ -1,8 +1,10 @@
-// 📁 lib/src/screens/admin/admin_application_detail_screen.dart (진짜 최종 수정본)
+// 📁 lib/src/screens/admin/admin_application_detail_screen.dart (반려 사유 기능 추가 최종본)
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 
 class AdminApplicationDetailScreen extends StatefulWidget {
   final String applicationId;
@@ -20,50 +22,113 @@ class AdminApplicationDetailScreen extends StatefulWidget {
 
 class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScreen> {
   bool _isProcessing = false;
+  late final TextEditingController _latController;
+  late final TextEditingController _lngController;
+  late final TextEditingController _addressController;
 
-  DocumentReference<Map<String, dynamic>> get _appDoc =>
-      FirebaseFirestore.instance.collection('store_applications').doc(widget.applicationId);
+  @override
+  void initState() {
+    super.initState();
+    final GeoPoint currentLocation = widget.applicationData['location'] ?? const GeoPoint(0, 0);
+    _latController = TextEditingController(text: currentLocation.latitude.toString());
+    _lngController = TextEditingController(text: currentLocation.longitude.toString());
+    _addressController = TextEditingController(text: widget.applicationData['address'] ?? '');
+  }
 
-  // 🔥🔥🔥 --- 관리자 페이지가 바라볼 '가게' 문서 경로를 정의합니다 --- 🔥🔥🔥
+  @override
+  void dispose() {
+    _latController.dispose();
+    _lngController.dispose();
+    _addressController.dispose();
+    super.dispose();
+  }
+
   DocumentReference<Map<String, dynamic>> get _storeDoc =>
       FirebaseFirestore.instance.collection('stores').doc(widget.applicationId);
 
-  // ...(이하 승인/반려/삭제 로직은 이전과 동일)...
+  Future<void> _searchCoordinates() async {
+    final address = _addressController.text.trim();
+    if (address.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('주소를 입력해주세요.'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    const kakaoRestApiKey = '2e8c74663cec574402127273f3597e1a';
+
+    final url = Uri.parse('https://dapi.kakao.com/v2/local/search/address.json?query=${Uri.encodeComponent(address)}');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {'Authorization': 'KakaoAK $kakaoRestApiKey'},
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['documents'] != null && data['documents'].isNotEmpty) {
+          final doc = data['documents'][0];
+          final lng = doc['x'];
+          final lat = doc['y'];
+          setState(() {
+            _latController.text = lat;
+            _lngController.text = lng;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('좌표를 성공적으로 찾았습니다.'), backgroundColor: Colors.green),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('해당 주소의 좌표를 찾을 수 없습니다.'), backgroundColor: Colors.orange),
+          );
+        }
+      } else {
+        throw Exception('카카오 API 호출 실패: ${response.body}');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('좌표 검색 중 오류 발생: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   Future<void> _approveApplication() async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
     try {
-      final now = FieldValue.serverTimestamp();
-      final reviewerUid = FirebaseAuth.instance.currentUser?.uid;
-      final applicationData = widget.applicationData;
+      final double? lat = double.tryParse(_latController.text.trim());
+      final double? lng = double.tryParse(_lngController.text.trim());
 
-      WriteBatch batch = FirebaseFirestore.instance.batch();
+      if (lat == null || lng == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('유효한 숫자 형식의 위도와 경도를 입력해주세요.'), backgroundColor: Colors.red),
+          );
+        }
+        setState(() => _isProcessing = false);
+        return;
+      }
 
-      batch.set(_storeDoc, {
-        'ownerId': applicationData['userId'],
-        'storeName': applicationData['storeName'],
-        'category': applicationData['category'],
-        'story': applicationData['story'],
-        'address': applicationData['address'],
-        'phone': applicationData['phone'],
-        'hours': applicationData['hours'],
-        'imageUrl': applicationData['imageUrl'],
-        'createdAt': now,
-        'nfcEnabled': false,
+      final newLocation = GeoPoint(lat, lng);
+
+      await _storeDoc.update({
+        'status': 'awaiting_nfc',
+        'location': newLocation,
+        'address': _addressController.text.trim(),
+        'reviewedAt': FieldValue.serverTimestamp(),
+        if (FirebaseAuth.instance.currentUser != null)
+          'reviewedBy': FirebaseAuth.instance.currentUser!.uid,
       });
-
-      batch.update(_appDoc, {
-        'status': 'approved',
-        'reviewedAt': now,
-        if (reviewerUid != null) 'reviewedBy': reviewerUid,
-      });
-
-      await batch.commit();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('승인 완료 및 가게가 활성화되었습니다.'), backgroundColor: Colors.green),
+        const SnackBar(content: Text('1차 승인 완료. 사용자의 NFC 등록을 대기합니다.'), backgroundColor: Colors.blue),
       );
     } catch (e) {
       if (!mounted) return;
@@ -77,25 +142,62 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
 
   Future<void> _rejectApplication() async {
     if (_isProcessing) return;
-    setState(() => _isProcessing = true);
-    try {
-      await _appDoc.update({
-        'status': 'rejected',
-        'reviewedAt': FieldValue.serverTimestamp(),
-        if (FirebaseAuth.instance.currentUser != null) 'reviewedBy': FirebaseAuth.instance.currentUser!.uid,
-      });
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('반려 처리되었습니다.'), backgroundColor: Colors.orange),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('반려 처리 중 오류 발생: $e'), backgroundColor: Colors.red),
-      );
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
+
+    final reason = await _showRejectReasonDialog(context);
+
+    if (reason != null && reason.isNotEmpty) {
+      setState(() => _isProcessing = true);
+      try {
+        await _storeDoc.update({
+          'status': 'rejected',
+          'rejectionReason': reason,
+          'reviewedAt': FieldValue.serverTimestamp(),
+          if (FirebaseAuth.instance.currentUser != null)
+            'reviewedBy': FirebaseAuth.instance.currentUser!.uid,
+        });
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('반려 처리되었습니다.'), backgroundColor: Colors.orange),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('반려 처리 중 오류 발생: $e'), backgroundColor: Colors.red),
+        );
+      } finally {
+        if (mounted) setState(() => _isProcessing = false);
+      }
     }
+  }
+
+  Future<String?> _showRejectReasonDialog(BuildContext context) {
+    final reasonController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('심사 반려'),
+          content: TextField(
+            controller: reasonController,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: '반려 사유를 입력하세요...'),
+            maxLines: 3,
+          ),
+          actions: [
+            TextButton(
+              child: const Text('취소'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ElevatedButton(
+              child: const Text('반려 확정'),
+              onPressed: () {
+                Navigator.of(context).pop(reasonController.text.trim());
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _deleteApplication() async {
@@ -108,13 +210,12 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
       for (final d in nfcSnap.docs) {
         batch.delete(d.reference);
       }
-      batch.delete(_appDoc);
       batch.delete(_storeDoc);
       await batch.commit();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('신청 기록 및 가게 정보가 영구 삭제되었습니다.'), backgroundColor: Colors.green));
+          const SnackBar(content: Text('가게 정보가 영구 삭제되었습니다.'), backgroundColor: Colors.green));
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
@@ -128,13 +229,11 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: _appDoc.snapshots(),
+      stream: _storeDoc.snapshots(),
       builder: (context, snap) {
-        final initial = widget.applicationData;
-        Map<String, dynamic> data = Map<String, dynamic>.from(initial);
-        if (snap.hasData && snap.data!.data() != null) {
-          data = {...data, ...snap.data!.data()!};
-        }
+        final Map<String, dynamic> data = snap.hasData && snap.data!.exists
+            ? snap.data!.data()!
+            : widget.applicationData;
 
         final status = (data['status'] as String?) ?? 'pending';
         final hasImage = (data['imageUrl'] is String) && (data['imageUrl'] as String).trim().isNotEmpty;
@@ -168,14 +267,55 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
                 _buildInfoTile('가게 이름', data['storeName']),
                 _buildInfoTile('카테고리', data['category']),
                 _buildInfoTile('가게 이야기', data['story']),
-                _buildInfoTile('가게 주소', data['address']),
+
+                const SizedBox(height: 16),
+                _buildTextFormField(
+                  controller: _addressController,
+                  labelText: '가게 주소',
+                  keyboardType: TextInputType.streetAddress,
+                ),
+
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isProcessing ? null : _searchCoordinates,
+                    icon: const Icon(Icons.search),
+                    label: const Text('입력된 주소로 좌표 검색'),
+                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTextFormField(
+                        controller: _latController,
+                        labelText: '위도 (Latitude)',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildTextFormField(
+                        controller: _lngController,
+                        labelText: '경도 (Longitude)',
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 24, thickness: 1),
+
                 _buildInfoTile('전화번호', data['phone']),
                 _buildInfoTile('영업 시간', data['hours']),
-                _buildInfoTile('신청자 UID', data['userId']),
+                _buildInfoTile('신청자 ID', data['ownerId']),
                 _buildInfoTile('현재 상태', status),
                 const SizedBox(height: 16),
+
                 if (status == 'approved') _buildNfcManagementSection(),
                 const SizedBox(height: 16),
+
                 if (status == 'pending')
                   _isProcessing
                       ? const Center(child: CircularProgressIndicator())
@@ -185,10 +325,10 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
                         child: ElevatedButton.icon(
                           onPressed: _approveApplication,
                           icon: const Icon(Icons.check_circle_outline),
-                          label: const Text('승인'),
+                          label: const Text('1차 승인'),
                           style: ElevatedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 48),
-                            backgroundColor: Colors.green[700],
+                            backgroundColor: Colors.blue[700],
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
@@ -219,7 +359,7 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
                       : ElevatedButton.icon(
                     onPressed: () => _showPermanentDeleteDialog(context),
                     icon: const Icon(Icons.delete_forever_outlined),
-                    label: const Text('이 신청 기록 영구 삭제'),
+                    label: const Text('가게 정보 영구 삭제'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red[700],
                       foregroundColor: Colors.white,
@@ -242,7 +382,6 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
       children: [
         const Text('NFC 관리', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        // 🔥🔥🔥 --- 바로 이 놈이 범인이었습니다. 조회 경로를 _storeDoc으로 바로잡았습니다. --- 🔥🔥🔥
         StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
           stream: _storeDoc.collection('nfc_tags').snapshots(),
           builder: (context, snap) {
@@ -284,7 +423,7 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
       builder: (BuildContext ctx) {
         return AlertDialog(
           title: const Text('영구 삭제 확인'),
-          content: const Text('정말로 이 신청 기록과 관련 가게 정보를 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.'),
+          content: const Text('정말로 이 가게 정보를 모두 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.'),
           actions: <Widget>[
             TextButton(
               child: const Text('취소'),
@@ -336,6 +475,34 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
           const SizedBox(width: 12),
           Expanded(child: Text(v)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTextFormField({
+    required TextEditingController controller,
+    required String labelText,
+    TextInputType? keyboardType,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        decoration: InputDecoration(
+          labelText: labelText,
+          border: const OutlineInputBorder(),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        ),
+        validator: (value) {
+          if (value == null || value.trim().isEmpty) {
+            return '값을 입력해주세요.';
+          }
+          if (keyboardType == const TextInputType.numberWithOptions(decimal: true, signed: true) && double.tryParse(value.trim()) == null) {
+            return '유효한 숫자를 입력해주세요.';
+          }
+          return null;
+        },
       ),
     );
   }

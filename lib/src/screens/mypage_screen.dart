@@ -8,7 +8,7 @@ import 'package:spotter/models/user_model.dart';
 import 'package:spotter/src/screens/crew_studio_screen.dart';
 import 'package:spotter/src/screens/my_growth_log_screen.dart';
 import 'package:spotter/src/screens/settings_screen.dart';
-import 'package:spotter/src/screens/user_profile_screen.dart';
+// import 'package:spotter/src/screens/user_profile_screen.dart'; // UserProfileScreen은 현재 사용되지 않으므로 주석 처리하거나 삭제하셔도 됩니다.
 import 'package:spotter/src/widgets/feed_card.dart';
 
 class MyPageScreen extends StatefulWidget {
@@ -153,9 +153,8 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
                     Text(userProfile.userName,
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    // --- 형님의 요청대로 수정된 부분 ---
                     Text(
-                      userProfile.levelTitle, // 레벨만 표시
+                      userProfile.levelTitle,
                       style: const TextStyle(color: Colors.grey, fontSize: 14),
                     ),
                   ],
@@ -217,11 +216,11 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
             children: [
               _ProfileStat(count: '${userProfile.crewCount}', label: '크루원'),
               _ProfileStat(count: '${userProfile.myCrewCount}', label: '나의 크루'),
-              // --- 형님의 요청대로 수정된 부분 ---
               _ProfileStat(count: userProfile.influenceTitle, label: '칭호'),
             ],
           ),
           const SizedBox(height: 24),
+          // --- 🔥🔥🔥 '가게 전환' 버튼이 여기서 제거되었습니다. ---
           ElevatedButton.icon(
             onPressed: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => CrewStudioScreen(userProfile: userProfile)));

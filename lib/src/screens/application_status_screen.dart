@@ -1,69 +1,89 @@
 // 📁 lib/src/screens/application_status_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:spotter/src/screens/nfc_registration_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spotter/src/screens/store_switch_screen.dart';
 
-class ApplicationStatusScreen extends StatelessWidget {
+class ApplicationStatusScreen extends StatefulWidget {
   final String status;
-  final String? storeId; // 가게 ID (applicationId와 동일)
 
   const ApplicationStatusScreen({
     super.key,
     required this.status,
-    this.storeId,
   });
 
   @override
-  Widget build(BuildContext context) {
-    Widget statusWidget;
+  State<ApplicationStatusScreen> createState() => _ApplicationStatusScreenState();
+}
 
+class _ApplicationStatusScreenState extends State<ApplicationStatusScreen> {
+  // --- 🔥🔥🔥 데이터를 실시간으로 가져오기 위해 StatefulWidget으로 변경 ---
+  Stream<DocumentSnapshot>? _storeStream;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _storeStream = FirebaseFirestore.instance.collection('stores').doc(user.uid).snapshots();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+          tooltip: '뒤로가기',
+        ),
+        title: const Text('신청 현황'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: StreamBuilder<DocumentSnapshot>(
+          stream: _storeStream,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (!snapshot.hasData || !snapshot.data!.exists) {
+              // 문서가 삭제되었거나 없는 경우, 이전 상태를 기반으로 표시
+              return _buildStatusViewByString(widget.status);
+            }
+
+            final data = snapshot.data!.data() as Map<String, dynamic>;
+            final status = data['status'] ?? widget.status;
+            final rejectionReason = data['rejectionReason'] as String?;
+
+            return _buildStatusViewByString(status, rejectionReason: rejectionReason);
+          },
+        ),
+      ),
+    );
+  }
+
+  // --- 🔥🔥🔥 상태와 반려사유에 따라 위젯을 생성하는 로직 분리 ---
+  Widget _buildStatusViewByString(String status, {String? rejectionReason}) {
     switch (status) {
       case 'pending':
-        statusWidget = _buildStatusView(
+        return _buildStatusView(
           icon: Icons.hourglass_empty_rounded,
           iconColor: Colors.orange,
           title: '심사가 진행 중입니다.',
-          message: '사장님의 소중한 가게 정보를 꼼꼼히 확인하고 있어요.\n심사가 완료되면 바로 알려드릴게요!',
+          message: '사장님의 소중한 가게 정보를 확인하고 있어요. 심사가 완료되면 바로 알려드릴게요!',
           subMessage: '실제 앱에서는 영업일 기준 1-2일이 소요됩니다.',
         );
-        break;
-      case 'approved':
-        statusWidget = _buildStatusView(
-          icon: Icons.check_circle_outline_rounded,
-          iconColor: Colors.green,
-          title: '심사가 완료되었습니다!',
-          message: '이제 사장님의 가게에 NFC 스티커를 등록하고\n손님들을 위한 스탬프 투어를 만들어보세요!',
-          button: ElevatedButton.icon(
-            // 🔥 수정된 부분: NfcRegistrationScreen으로 applicationId를 전달합니다.
-            onPressed: () {
-              if (storeId != null) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => NfcRegistrationScreen(applicationId: storeId!)),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('가게 ID가 없어 NFC 등록을 진행할 수 없습니다.'), backgroundColor: Colors.red),
-                );
-              }
-            },
-            icon: const Icon(Icons.nfc_rounded),
-            label: const Text('NFC 스티커 등록하기'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-          ),
-        );
-        break;
       case 'rejected':
-        statusWidget = _buildStatusView(
+        return _buildStatusView(
           icon: Icons.error_outline_rounded,
           iconColor: Colors.red,
           title: '심사 요청이 반려되었습니다.',
-          message: '아쉽지만, 일부 정보가 명확하지 않아 심사가 반려되었어요.\n정보를 수정하여 다시 신청해주세요.',
+          message: rejectionReason != null && rejectionReason.isNotEmpty
+              ? '반려 사유:\n"$rejectionReason"'
+              : '아쉽지만, 일부 정보가 명확하지 않아 심사가 반려되었어요.',
           button: ElevatedButton(
             onPressed: () {
               Navigator.of(context).pushReplacement(
@@ -73,23 +93,19 @@ class ApplicationStatusScreen extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
-            child: const Text('다시 신청하기'),
+            child: const Text('정보 수정 후 다시 신청하기'),
           ),
         );
-        break;
       default:
-        statusWidget = const Center(child: Text('알 수 없는 상태입니다.'));
+      // approved, awaiting_nfc 등의 상태는 라우터에서 다른 화면으로 보내므로
+      // 이 화면에서는 기본적으로 보이지 않아야 합니다.
+        return _buildStatusView(
+          icon: Icons.help_outline,
+          iconColor: Colors.grey,
+          title: '알 수 없는 상태입니다.',
+          message: '고객센터로 문의해주세요.',
+        );
     }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('신청 현황'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: statusWidget,
-      ),
-    );
   }
 
   Widget _buildStatusView({

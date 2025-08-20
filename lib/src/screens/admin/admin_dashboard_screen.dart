@@ -51,7 +51,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(text: '심사 대기 중'),
+            Tab(text: '전체 목록 (실험)'), // 탭 이름을 '전체 목록'으로 변경
             Tab(text: '승인 완료'),
             Tab(text: '반려된 요청'),
           ],
@@ -60,7 +60,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildApplicationList(status: 'pending'),
+          // --- 🔥🔥🔥 이 부분의 쿼리를 수정했습니다! ---
+          _buildApplicationList(status: 'all'), // 모든 문서를 가져오도록 'all'이라는 특별 상태를 사용
           _buildApplicationList(status: 'approved'),
           _buildApplicationList(status: 'rejected'),
         ],
@@ -70,42 +71,56 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
 
   Widget _buildApplicationList({required String status}) {
     String emptyMessage = '해당 상태의 요청이 없습니다.';
-    if (status == 'pending') emptyMessage = '대기 중인 심사 요청이 없습니다.';
+    if (status == 'all') emptyMessage = 'stores 컬렉션에 문서가 없습니다.';
     if (status == 'approved') emptyMessage = '승인 완료된 요청이 없습니다.';
     if (status == 'rejected') emptyMessage = '반려된 요청이 없습니다.';
 
+    // status 값에 따라 쿼리를 동적으로 변경합니다.
+    Query query = FirebaseFirestore.instance.collection('stores');
+    if (status != 'all') {
+      query = query.where('status', isEqualTo: status);
+    }
+    // 정렬은 일단 제거합니다.
+    // query = query.orderBy('createdAt', descending: true);
+
+    print("Firestore 쿼리 실행: collection=stores, status=$status");
+
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('store_applications')
-          .where('status', isEqualTo: status)
-          .orderBy('submittedAt', descending: true)
-          .snapshots(),
+      stream: query.snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
+          print("Firestore 스트림 에러: ${snapshot.error}");
           return Center(child: Text('오류가 발생했습니다: ${snapshot.error}'));
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          print("데이터 없음: $emptyMessage");
           return Center(
             child: Text(emptyMessage, style: const TextStyle(fontSize: 18, color: Colors.grey)),
           );
         }
 
         final applications = snapshot.data!.docs;
+        print("데이터 조회 성공: ${applications.length}개 문서 발견");
 
         return ListView.builder(
           itemCount: applications.length,
           itemBuilder: (context, index) {
             final doc = applications[index];
             final data = doc.data() as Map<String, dynamic>;
-            final submittedAt = (data['submittedAt'] as Timestamp?)?.toDate();
+
+            // 문서의 모든 내용을 콘솔에 출력하여 데이터를 확인합니다.
+            print("문서[${index}] 내용: $data");
+
+            final createdAt = (data['createdAt'] as Timestamp?)?.toDate();
+            final currentStatus = data['status'] ?? '상태 불명';
 
             return ListTile(
-              leading: Icon(_getIconForStatus(status)),
+              leading: Icon(_getIconForStatus(currentStatus)),
               title: Text(data['storeName'] ?? '이름 없음'),
-              subtitle: Text('신청일: ${submittedAt?.toLocal().toString().substring(0, 16) ?? '알 수 없음'}'),
+              subtitle: Text('상태: $currentStatus | 신청일: ${createdAt?.toLocal().toString().substring(0, 16) ?? '알 수 없음'}'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
                 Navigator.push(

@@ -1,12 +1,11 @@
-// 📁 lib/src/screens/nfc_registration_screen.dart (수정본)
+// 📁 lib/src/screens/nfc_registration_screen.dart (UX 개선 최종본)
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:nfc_manager/nfc_manager.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:spotter/services/mode_prefs.dart';
 import 'package:spotter/src/screens/owner/store_owner_main_screen.dart';
-// 🔥🔥🔥 --- 바로 이 부분입니다, 형님! --- 🔥🔥🔥
-import 'package:firebase_auth/firebase_auth.dart'; // 누락되었던 import 구문 추가
+import 'package:firebase_auth/firebase_auth.dart';
 
 class NfcRegistrationScreen extends StatefulWidget {
   final String applicationId;
@@ -21,16 +20,13 @@ class NfcRegistrationScreen extends StatefulWidget {
 }
 
 class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
-  String _scanStatus = 'NFC 스캔 준비 완료';
-  IconData _statusIcon = Icons.nfc;
-  Color _statusColor = Colors.grey;
+  // UI 상태를 관리하기 위한 변수들
+  bool _isScanning = false; // 스캔 시작 여부
+  String _statusMessage = '가게 승인이 완료되었습니다.';
+  String _subStatusMessage = '배송된 NFC 스탬프를 아래 버튼을 눌러 등록을 시작해주세요.';
+  IconData _statusIcon = Icons.store_mall_directory_rounded;
+  Color _statusColor = Colors.blue;
   bool _isRegistrationComplete = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _startNfcScan();
-  }
 
   @override
   void dispose() {
@@ -39,7 +35,12 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
   }
 
   void _startNfcScan() async {
-    // ... (내부 로직은 이전과 동일)
+    // 스캔 시작 상태로 UI 변경
+    setState(() {
+      _isScanning = true;
+      _updateStatus('NFC를 휴대폰 뒷면에 태그해주세요.', Icons.nfc, Colors.blue);
+    });
+
     bool isAvailable = await NfcManager.instance.isAvailable();
     if (!isAvailable) {
       _updateStatus('NFC를 지원하지 않는 기기입니다.', Icons.error_outline, Colors.red);
@@ -59,10 +60,9 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
           final identifier = tag.data['ndef']['identifier'];
           final tagId = identifier.map((e) => e.toRadixString(16).padLeft(2, '0')).join('');
 
-          _updateStatus('태그 감지 완료! 데이터베이스 등록 중...', Icons.wifi_tethering, Colors.blue);
+          _updateStatus('태그 감지 완료!\n데이터베이스 등록 중...', Icons.wifi_tethering, Colors.blue);
 
           final storeDocRef = FirebaseFirestore.instance.collection('stores').doc(widget.applicationId);
-
           WriteBatch batch = FirebaseFirestore.instance.batch();
 
           batch.set(storeDocRef.collection('nfc_tags').doc(tagId), {
@@ -71,10 +71,13 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
             'isActive': true,
           });
 
-          batch.set(storeDocRef, {'nfcEnabled': true}, SetOptions(merge: true));
+          batch.update(storeDocRef, {
+            'nfcEnabled': true,
+            'status': 'approved',
+          });
 
           await batch.commit();
-
+          await ModePrefs.setStoreMode(true);
           await NfcManager.instance.stopSession();
           _updateStatus('NFC가 가게에 성공적으로 등록되었습니다!', Icons.check_circle, Colors.green, isComplete: true);
 
@@ -87,13 +90,13 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
         _updateStatus('NFC 스캔 오류: ${e.message}', Icons.error, Colors.red);
       },
     );
-    _updateStatus('NFC를 휴대폰 뒷면에 태그해주세요.', Icons.nfc, Colors.blue);
   }
 
   void _updateStatus(String message, IconData icon, Color color, {bool isComplete = false}) {
     if (mounted) {
       setState(() {
-        _scanStatus = message;
+        _statusMessage = message;
+        _subStatusMessage = ''; // 스캔 시작 후에는 서브 메시지 없음
         _statusIcon = icon;
         _statusColor = color;
         _isRegistrationComplete = isComplete;
@@ -105,7 +108,8 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NFC 등록'),
+        title: const Text('NFC 스탬프 등록'),
+        automaticallyImplyLeading: false,
       ),
       body: Center(
         child: Padding(
@@ -116,33 +120,51 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
               Icon(_statusIcon, size: 100, color: _statusColor),
               const SizedBox(height: 24),
               Text(
-                _scanStatus,
-                style: const TextStyle(fontSize: 18),
+                _statusMessage,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 32),
+              if (_subStatusMessage.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12.0),
+                  child: Text(
+                    _subStatusMessage,
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              const SizedBox(height: 48),
+
+              // UI 로직: 상태에 따라 다른 버튼을 보여줍니다.
               if (_isRegistrationComplete)
                 ElevatedButton(
-                  onPressed: () async {
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setBool('forceStoreMode', true);
-
-                    if (mounted) {
-                      final user = FirebaseAuth.instance.currentUser;
-                      if (user != null) {
-                        Navigator.of(context).pushAndRemoveUntil(
+                  onPressed: () {
+                    final user = FirebaseAuth.instance.currentUser;
+                    if (user != null) {
+                      Navigator.of(context).pushAndRemoveUntil(
                           MaterialPageRoute(
                             builder: (context) => StoreOwnerMainScreen(user: user),
-                          ),
-                              (route) => false,
-                        );
-                      }
+                          ), (route) => false);
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 12),
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 52),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('가게 관리하러 가기'),
+                  child: const Text('가게 관리 시작하기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                )
+              else if (!_isScanning)
+                ElevatedButton(
+                  onPressed: _startNfcScan, // 버튼을 눌러야만 스캔이 시작됩니다.
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 52),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('NFC 등록 시작', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
             ],
           ),

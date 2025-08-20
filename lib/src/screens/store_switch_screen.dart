@@ -7,7 +7,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dotted_border/dotted_border.dart';
-import 'package:spotter/src/screens/application_status_screen.dart'; // 추가된 부분
+import 'package:spotter/src/screens/application_status_screen.dart';
 
 class StoreSwitchScreen extends StatefulWidget {
   const StoreSwitchScreen({super.key});
@@ -49,6 +49,7 @@ class _StoreSwitchScreenState extends State<StoreSwitchScreen> {
     }
   }
 
+  // --- 🔥🔥🔥 형님의 지시대로 이 함수를 수정했습니다. ---
   Future<void> _submitApplication() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -69,12 +70,15 @@ class _StoreSwitchScreenState extends State<StoreSwitchScreen> {
       }
       final userId = user.uid;
 
-      final ref = FirebaseStorage.instance.ref('store_application_photos').child('$userId.jpg');
+      // 이미지는 store_photos 경로에 저장합니다.
+      final ref = FirebaseStorage.instance.ref('store_photos').child('$userId.jpg');
       await ref.putFile(File(_image!.path));
       final imageUrl = await ref.getDownloadURL();
 
-      await FirebaseFirestore.instance.collection('store_applications').doc(userId).set({
-        'userId': userId,
+      // 'store_applications' 대신 'stores' 컬렉션에 직접 문서를 생성합니다.
+      // ownerId 필드를 추가하여 가게 소유주를 명확히 합니다.
+      await FirebaseFirestore.instance.collection('stores').doc(userId).set({
+        'ownerId': userId, // 가게 소유주 ID
         'storeName': _nameController.text.trim(),
         'category': _categoryController.text.trim(),
         'story': _storyController.text.trim(),
@@ -82,13 +86,18 @@ class _StoreSwitchScreenState extends State<StoreSwitchScreen> {
         'phone': _phoneController.text.trim(),
         'hours': _hoursController.text.trim(),
         'imageUrl': imageUrl,
-        'status': 'pending', // 심사 상태: 대기중
-        'submittedAt': FieldValue.serverTimestamp(),
+
+        // --- 형님 요청 자동 추가 필드 1: status ---
+        'status': 'pending', // 심사 상태는 'pending'(심사중)으로 자동 설정
+
+        // --- 형님 요청 자동 추가 필드 2: location ---
+        'location': const GeoPoint(35.8714, 128.6014), // 기본 좌표(대구 시청)로 자동 설정
+
+        'createdAt': FieldValue.serverTimestamp(), // 생성 시각 기록
+        'nfcEnabled': false, // nfc는 승인 시 활성화되므로 기본값은 false
       });
 
       if (mounted) {
-        // --- 형님의 요청대로 수정된 부분 ---
-        // 신청 완료 후, '신청 현황' 화면으로 바로 이동합니다.
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => const ApplicationStatusScreen(status: 'pending'),
