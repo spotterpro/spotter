@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:spotter/main.dart';
 import 'package:spotter/models/user_model.dart';
 import 'home_screen.dart';
 import 'community_screen.dart';
@@ -24,37 +24,50 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-
-  late List<Map<String, dynamic>> _allFeedItems;
+  late List<Widget> _pages;
+  // _allFeedItems는 HomeScreen으로 전달되므로, 여기서는 더 이상 필요하지 않습니다.
+  // late List<Map<String, dynamic>> _allFeedItems;
 
   @override
   void initState() {
     super.initState();
-    _allFeedItems = [
-      {
-        'id': 'poll_1',
-        'isCertified': true,
-        'author': {
-          'name': '헬창', 'imageSeed': 'user3', 'levelTitle': 'LV.35', 'uid': 'some_other_uid'
-        },
-        'time': Timestamp.now(),
-        'caption': '주말에 운동 어디로 갈까요?',
-        'tags': ['#오운완', '#운동'],
-        'poll': {
-          'options': [
-            { 'text': '헬스 클럽 (수성구)', 'votes': [] },
-            { 'text': '요가 스튜디오 (남구)', 'votes': [] },
-          ]
-        },
-      },
-      {'id': 'cert_1', 'author': {'name': '스포터', 'imageSeed': 'user1', 'levelTitle': 'LV.15'}, 'storeName': '클린한 세탁소 · 3일 전', 'postImageSeed': 'laundry_feed', 'caption': '세탁 맡겼던 운동화 찾는 날. 새것처럼 깨끗해져서 기분 최고! ✨', 'tags': ['#세탁'], 'isCertified': true, 'time': Timestamp.fromMillisecondsSinceEpoch(DateTime.now().subtract(const Duration(days: 3)).millisecondsSinceEpoch)},
+    final currentUserMap = widget.currentUserProfile.toMap();
+
+    // --- 🔥🔥🔥 수정된 부분: 페이지 목록을 5개로 정확하게 맞춥니다. ---
+    _pages = [
+      // 페이지 0: 홈
+      HomeScreen(
+        feedItems: const [], // 피드 데이터는 HomeScreen 자체에서 불러오는 것이 좋습니다.
+        onDelete: (id) {},
+        currentUser: currentUserMap,
+      ),
+      // 페이지 1: 커뮤니티
+      CommunityScreen(currentUser: currentUserMap),
+      // 페이지 2: 스탬프
+      const StampScreen(),
+      // 페이지 3: 피드작성 (IndexedStack용 빈 컨테이너, 실제 화면은 onTap에서 처리)
+      Container(),
+      // 페이지 4: 마이페이지
+      MyPageScreen(
+        currentUserProfile: widget.currentUserProfile,
+        onProfileUpdated: _updateProfile,
+      ),
     ];
+
+    mainScreenNavigator.addListener(_onNavigate);
   }
 
-  void _deleteFeedItem(String id) {
-    setState(() {
-      _allFeedItems.removeWhere((item) => item['id'] == id);
-    });
+  @override
+  void dispose() {
+    mainScreenNavigator.removeListener(_onNavigate);
+    super.dispose();
+  }
+
+  void _onNavigate() {
+    // 탭 인덱스가 범위 내에 있을 때만 상태를 변경합니다.
+    if (mounted && mainScreenNavigator.value >= 0 && mainScreenNavigator.value < _pages.length) {
+      _onItemTapped(mainScreenNavigator.value);
+    }
   }
 
   void _updateProfile(Map<String, String> newProfile) {
@@ -62,76 +75,56 @@ class _MainScreenState extends State<MainScreen> {
     print("프로필 업데이트: $newProfile");
   }
 
+  void _onItemTapped(int index) {
+    // 탭 인덱스 3이 피드 작성이므로 분기 처리
+    if (index == 3) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => UploadFeedScreen(currentUser: widget.currentUserProfile.toMap())),
+      );
+    } else {
+      setState(() {
+        _selectedIndex = index;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final currentUserMap = widget.currentUserProfile.toMap();
-
-    final List<Widget> pages = [
-      HomeScreen(
-        feedItems: _allFeedItems,
-        onDelete: _deleteFeedItem,
-        currentUser: currentUserMap,
-      ),
-      CommunityScreen(currentUser: currentUserMap),
-      const StampScreen(),
-      UploadFeedScreen(currentUser: currentUserMap),
-      MyPageScreen(
-        currentUserProfile: widget.currentUserProfile,
-        onProfileUpdated: _updateProfile,
-      ),
-    ];
-
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: pages,
+        children: _pages,
       ),
       bottomNavigationBar: BottomNavigationBar(
-        items: <BottomNavigationBarItem>[
+        items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
-            icon: const Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home, color: Colors.orange[600]),
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
             label: '홈',
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.people_outline),
-            activeIcon: Icon(Icons.people, color: Colors.orange[600]),
+            icon: Icon(Icons.people_outline),
+            activeIcon: Icon(Icons.people),
             label: '커뮤니티',
           ),
-          // --- 형님 지시대로 재수정된 부분 ---
           BottomNavigationBarItem(
-            icon: const FaIcon(FontAwesomeIcons.stamp),
-            activeIcon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange[600], // 시그니처 배경색
-                shape: BoxShape.circle,
-              ),
-              child: const FaIcon(
-                FontAwesomeIcons.stamp,
-                color: Colors.white, // 대비되는 아이콘 색상
-                size: 20, // 아이콘 크기 조정
-              ),
-            ),
+            icon: FaIcon(FontAwesomeIcons.stamp),
             label: '스탬프',
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.add_box_outlined),
-            activeIcon: Icon(Icons.add_box, color: Colors.orange[600]),
+            icon: Icon(Icons.add_box_outlined),
             label: '피드작성',
           ),
           BottomNavigationBarItem(
-            icon: const Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person, color: Colors.orange[600]),
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
             label: '마이페이지',
           ),
         ],
         currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
+        onTap: _onItemTapped,
+        selectedItemColor: Colors.orange[800],
         unselectedItemColor: Colors.grey[600],
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: true,

@@ -1,7 +1,7 @@
-// 📁 lib/src/screens/home_screen.dart (오타 수정 최종본)
+// 📁 lib/src/screens/home_screen.dart
 
 import 'package:flutter/material.dart';
-import 'dart:async'; // --- 🔥🔥🔥 형님, 이 부분의 오타를 수정했습니다! ---
+import 'dart:async';
 import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:spotter/src/screens/message_screen.dart';
@@ -31,39 +31,33 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedTagIndex = 0;
   final List<String> _tags = ['#전체', '#동성로', '#율하', '#수성못', '#앞산', '#세탁', '#파스타맛집'];
 
-  late KakaoMapController mapController;
+  KakaoMapController? mapController;
   Set<Marker> markers = {};
-
   StreamSubscription<QuerySnapshot>? _storeSubscription;
 
   @override
   void initState() {
     super.initState();
-    // initState에서는 이제 아무것도 호출하지 않습니다.
   }
 
   void _startStoreSubscription() {
     _storeSubscription?.cancel();
-
     _storeSubscription = FirebaseFirestore.instance
         .collection('stores')
         .where('status', isEqualTo: 'approved')
+        .where('hasRewards', isEqualTo: true)
         .snapshots()
         .listen((snapshot) {
-
       final newMarkers = <Marker>{};
       for (var doc in snapshot.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final GeoPoint location = data['location'];
-        final String storeName = data['storeName'] ?? '이름 없는 가게';
 
         newMarkers.add(Marker(
           markerId: doc.id,
           latLng: LatLng(location.latitude, location.longitude),
-          infoWindowContent: '<div style="padding:5px; font-size:12px;">$storeName</div>',
         ));
       }
-
       if (mounted) {
         setState(() {
           markers = newMarkers;
@@ -72,6 +66,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }, onError: (error) {
       print("가게 정보 실시간 감시 실패: $error");
     });
+  }
+
+  Future<void> _onMarkerTapped(String markerId) async {
+    try {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => StoreDetailScreen(storeId: markerId)),
+      );
+    } catch (e) {
+      print('가게 상세 정보 로딩 실패: $e');
+    }
   }
 
   @override
@@ -125,6 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 }),
                 markers: markers.toList(),
                 center: LatLng(35.8714, 128.6014),
+                onMarkerTap: (markerId, latLng, zoomLevel) => _onMarkerTapped(markerId),
               ),
             ),
           ),
@@ -134,6 +140,141 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildSectionHeader("실시간 스팟 피드"),
           _buildRealtimeFeedList(displayedItems),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTrendingSpotsList(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collectionGroup('rewards')
+          .where('isActive', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .limit(10)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(height: 230, child: Center(child: CircularProgressIndicator()));
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const SizedBox(height: 230, child: Center(child: Text('현재 추천 스팟이 없습니다.')));
+        }
+        final trendingSpots = snapshot.data!.docs;
+
+        return SizedBox(
+          height: 230,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            itemCount: trendingSpots.length,
+            itemBuilder: (context, index) {
+              final spotDoc = trendingSpots[index];
+              final spot = spotDoc.data() as Map<String, dynamic>;
+
+              // --- 🔥🔥🔥 수정된 부분: 표시할 이미지 URL을 결정합니다. ---
+              // 1순위: 리워드 자체 이미지, 2순위: 가게 대표 이미지
+              final String? displayImageUrl = spot['imageUrl'] ?? spot['storeImageUrl'];
+
+              final spotForCard = {
+                'type': '리워드',
+                'title': spot['title'] ?? '리워드',
+                'storeName': spot['storeName'] ?? '가게',
+                'imageUrl': displayImageUrl, // 사용할 이미지 URL 전달
+                'storeId': spot['storeId'],
+              };
+              return _buildSpotCard(context, spotForCard);
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSpotCard(BuildContext context, Map<String, dynamic> spot) {
+    final storeId = spot['storeId'] as String?;
+    final imageUrl = spot['imageUrl'] as String?;
+
+    return Container(
+      width: 160,
+      margin: const EdgeInsets.only(right: 12.0),
+      child: InkWell(
+        onTap: () {
+          if (storeId != null && storeId.isNotEmpty) {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => StoreDetailScreen(storeId: storeId)));
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  // --- 🔥🔥🔥 수정된 부분: imageUrl이 있으면 그것을, 없으면 임시 이미지를 보여줍니다. ---
+                  child: imageUrl != null && imageUrl.isNotEmpty
+                      ? Image.network(
+                    imageUrl,
+                    height: 140,
+                    width: 160,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                        height: 140,
+                        width: 160,
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.error_outline, color: Colors.grey)
+                    ),
+                  )
+                      : Container(
+                      height: 140,
+                      width: 160,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.image_not_supported, color: Colors.grey)
+                  ),
+                ),
+                Positioned(
+                  top: 8, left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.orange[400], borderRadius: BorderRadius.circular(8)),
+                    child: Text(spot['type'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+              child: Text(spot['title'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+              child: Row(
+                children: [
+                  Expanded(child: Text(spot['storeName'] ?? '', style: TextStyle(color: Colors.grey[600], fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+              child: Row(
+                children: [
+                  Icon(Icons.favorite, color: Colors.red[400], size: 14),
+                  const SizedBox(width: 4),
+                  if (storeId != null && storeId.isNotEmpty)
+                    StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance.collection('stores').doc(storeId).collection('regulars').snapshots(),
+                        builder: (context, snapshot) {
+                          final count = snapshot.data?.size ?? 0;
+                          return Text('단골 $count', style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500));
+                        }
+                    )
+                  else
+                    Text('단골 0', style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -162,104 +303,6 @@ class _HomeScreenState extends State<HomeScreen> {
           currentUser: widget.currentUser,
         );
       },
-    );
-  }
-
-  Widget _buildTrendingSpotsList(BuildContext context) {
-    final trendingSpots = [
-      {
-        'type': '리워드', 'title': '첫 방문 10% 할인',
-        'storeData': {
-          'storeName': '맛집 파스타', 'regulars': 125, 'seed': 'pasta',
-          'category': '음식점', 'description': '매일 아침 직접 뽑는 생면으로 만드는 인생 파스타.', 'address': '대구시 중구 서문시장'
-        }
-      },
-      {
-        'type': '투어', 'title': '동네 카페 정복하기',
-        'storeName': '카페 스프링 외 4곳', 'regulars': 88, 'seed': 'cafe_tour',
-        'tourData': { 'title': '동네 카페 정복하기', 'description': '우리 동네 숨은 카페 5곳을 방문해보세요!', 'reward': '커피콩 원두 증정', 'stamps': [ {'completed': true, 'name': '카페 스프링', 'date': '2024-05-20', 'seed': 'cafe1'}, {'completed': false, 'name': '커피나무', 'date': null, 'seed': 'cafe2'}, ], }
-      },
-    ];
-    return SizedBox(
-      height: 230,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        itemCount: trendingSpots.length,
-        itemBuilder: (context, index) {
-          final spot = trendingSpots[index];
-          return _buildSpotCard(context, spot);
-        },
-      ),
-    );
-  }
-
-  Widget _buildSpotCard(BuildContext context, Map<String, dynamic> spot) {
-    final bool isTour = spot['type'] == '투어';
-    final Color chipColor = isTour ? Colors.purple[400]! : Colors.orange[400]!;
-    final storeData = spot['storeData'] as Map<String, dynamic>?;
-
-    return Container(
-      width: 160,
-      margin: const EdgeInsets.only(right: 12.0),
-      child: InkWell(
-        onTap: () {
-          if (isTour) {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => TourDetailScreen(tourData: spot['tourData'])));
-          } else if (storeData != null) {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => StoreDetailScreen(storeData: storeData)));
-          }
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network('https://picsum.photos/seed/${spot['seed'] ?? storeData?['seed']}/200/200', height: 140, width: 160, fit: BoxFit.cover),
-                ),
-                Positioned(
-                  top: 8, left: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: chipColor, borderRadius: BorderRadius.circular(8)),
-                    child: Text(spot['type'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-              child: Text(spot['title'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 8,
-                    backgroundImage: NetworkImage('https://picsum.photos/seed/${spot['seed'] ?? storeData?['seed']}/50/50'),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(child: Text(spot['storeName'] ?? storeData?['storeName'] ?? '', style: TextStyle(color: Colors.grey[600], fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
-              child: Row(
-                children: [
-                  Icon(Icons.favorite, color: Colors.red[400], size: 14),
-                  const SizedBox(width: 4),
-                  Text('단골 ${spot['regulars'] ?? storeData?['regulars'] ?? 0}', style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

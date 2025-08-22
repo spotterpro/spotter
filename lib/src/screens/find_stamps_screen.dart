@@ -1,3 +1,5 @@
+// 📁 lib/src/screens/find_stamps_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:spotter/src/screens/store_detail_screen.dart';
 import 'package:spotter/src/screens/tour_detail_screen.dart';
@@ -16,6 +18,7 @@ class FindStampsScreen extends StatelessWidget {
         'subtitle': "맛집 파스타",
         'trailing': "800m",
         'storeData': <String, dynamic>{
+          'id': '6PdcdJAiNqVpZ9DDvtY0itRGYBP2', // 임시 가게 ID 추가
           'storeName': '맛집 파스타',
           'regulars': 125,
           'seed': 'pasta',
@@ -32,6 +35,7 @@ class FindStampsScreen extends StatelessWidget {
         'subtitle': "맛집 파스타",
         'trailing': "800m",
         'storeData': <String, dynamic>{
+          'id': '6PdcdJAiNqVpZ9DDvtY0itRGYBP2', // 임시 가게 ID 추가
           'storeName': '맛집 파스타',
           'regulars': 125,
           'seed': 'pasta',
@@ -129,15 +133,18 @@ class FindStampsScreen extends StatelessWidget {
         ),
         onTap: () {
           if (isTour) {
-            // --- 형님의 요청대로 수정된 부분 ---
             Navigator.push(context, MaterialPageRoute(builder: (context) => TourDetailScreen(tourData: tourData)));
           } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => StoreDetailScreen(storeData: storeData),
-              ),
-            );
+            // --- 🔥🔥🔥 수정된 부분 ---
+            final storeId = storeData['id'] as String?;
+            if (storeId != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => StoreDetailScreen(storeId: storeId),
+                ),
+              );
+            }
           }
         },
       ),

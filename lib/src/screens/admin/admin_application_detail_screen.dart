@@ -1,4 +1,4 @@
-// 📁 lib/src/screens/admin/admin_application_detail_screen.dart (반려 사유 기능 추가 최종본)
+// 📁 lib/src/screens/admin/admin_application_detail_screen.dart
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -203,19 +203,35 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
   Future<void> _deleteApplication() async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
+
     try {
-      final nfcCol = _storeDoc.collection('nfc_tags');
-      final nfcSnap = await nfcCol.get();
       final batch = FirebaseFirestore.instance.batch();
-      for (final d in nfcSnap.docs) {
-        batch.delete(d.reference);
+
+      final rewardsSnap = await _storeDoc.collection('rewards').get();
+      final regularsSnap = await _storeDoc.collection('regulars').get();
+      final visitsSnap = await _storeDoc.collection('visits').get();
+      final nfcTagsSnap = await _storeDoc.collection('nfc_tags').get();
+
+      for (final doc in rewardsSnap.docs) {
+        batch.delete(doc.reference);
       }
+      for (final doc in regularsSnap.docs) {
+        batch.delete(doc.reference);
+      }
+      for (final doc in visitsSnap.docs) {
+        batch.delete(doc.reference);
+      }
+      for (final doc in nfcTagsSnap.docs) {
+        batch.delete(doc.reference);
+      }
+
       batch.delete(_storeDoc);
+
       await batch.commit();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('가게 정보가 영구 삭제되었습니다.'), backgroundColor: Colors.green));
+          const SnackBar(content: Text('가게 정보 및 관련 데이터가 영구 삭제되었습니다.'), backgroundColor: Colors.green));
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
@@ -234,6 +250,22 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
         final Map<String, dynamic> data = snap.hasData && snap.data!.exists
             ? snap.data!.data()!
             : widget.applicationData;
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && snap.hasData && snap.data!.exists) {
+            final dbAddress = snap.data!.data()!['address'] ?? '';
+            if (_addressController.text != dbAddress) {
+              _addressController.text = dbAddress;
+            }
+            final location = snap.data!.data()!['location'] as GeoPoint?;
+            if (_latController.text != location?.latitude.toString()) {
+              _latController.text = location?.latitude.toString() ?? '0';
+            }
+            if (_lngController.text != location?.longitude.toString()) {
+              _lngController.text = location?.longitude.toString() ?? '0';
+            }
+          }
+        });
 
         final status = (data['status'] as String?) ?? 'pending';
         final hasImage = (data['imageUrl'] is String) && (data['imageUrl'] as String).trim().isNotEmpty;

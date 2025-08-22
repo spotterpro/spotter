@@ -1,10 +1,9 @@
-// 📁 lib/main.dart (최종 수정본 - 초기화 코드 복원)
+// 📁 lib/main.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-// --- 🔥🔥🔥 이 부분이 다시 필요합니다, 형님! ---
 import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 import 'package:spotter/firebase_options.dart';
 import 'package:spotter/models/user_model.dart';
@@ -12,15 +11,14 @@ import 'package:spotter/src/screens/login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spotter/src/screens/app_decider.dart';
 
+// --- 🔥🔥🔥 이 부분이 '전역 신호기'의 본체입니다. ---
+final ValueNotifier<int> mainScreenNavigator = ValueNotifier(0);
+
 ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // --- 🔥🔥🔥 제가 삭제하라고 했던 이 코드를 다시 복원해야 합니다! ---
-  // 형님의 네이티브 앱 키: 3f7eeaf7f86b376c410316e1280d0bac
   AuthRepository.initialize(appKey: '3f7eeaf7f86b376c410316e1280d0bac');
-
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -30,7 +28,6 @@ void main() async {
   runApp(const MyApp());
 }
 
-// MyApp 클래스와 AuthWrapper 클래스는 기존과 동일합니다.
 class MyApp extends StatelessWidget {
   const MyApp({Key? key}) : super(key: key);
 
@@ -42,8 +39,14 @@ class MyApp extends StatelessWidget {
           return MaterialApp(
             title: 'Spotter',
             debugShowCheckedModeBanner: false,
-            theme: ThemeData( /* ...기존 테마 설정... */ ),
-            darkTheme: ThemeData.dark( /* ...기존 다크 테마 설정... */ ),
+            theme: ThemeData(
+              primarySwatch: Colors.orange,
+              visualDensity: VisualDensity.adaptivePlatformDensity,
+            ),
+            darkTheme: ThemeData.dark().copyWith(
+              primaryColor: Colors.orange,
+              indicatorColor: Colors.orange,
+            ),
             themeMode: currentMode,
             home: StreamBuilder<User?>(
               stream: FirebaseAuth.instance.authStateChanges(),

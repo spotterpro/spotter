@@ -7,17 +7,7 @@ class OwnerMessagesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('메시지'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.exit_to_app),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
-      body: const Center(child: Text('메시지 화면')),
-    );
+    // --- 🔥🔥🔥 수정된 부분: Scaffold와 AppBar를 제거하고 내용물인 Center만 남깁니다. ---
+    return const Center(child: Text('메시지 기능 준비중 입니다.'));
   }
 }

@@ -1,3 +1,5 @@
+// 📁 lib/src/screens/store_news_detail_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:spotter/src/screens/store_detail_screen.dart';
 
@@ -20,12 +22,11 @@ class _StoreNewsDetailScreenState extends State<StoreNewsDetailScreen> {
   final TextEditingController _editController = TextEditingController();
 
   final Map<String, dynamic> _storeData = {
+    'id': '6PdcdJAiNqVpZ9DDvtY0itRGYBP2', // 임시 가게 ID 추가
     'storeName': '맛집 파스타', 'regulars': 125, 'seed': 'pasta',
     'category': '음식점', 'description': '매일 아침 직접 뽑는 생면으로 만드는 인생 파스타.', 'address': '대구시 중구 서문시장'
   };
 
-  // --- 형님의 요청대로 수정된 부분 ---
-  // 현재 사용자의 이름을 임시로 지정합니다.
   final String _currentUserName = '형님';
 
   @override
@@ -124,9 +125,7 @@ class _StoreNewsDetailScreenState extends State<StoreNewsDetailScreen> {
   }
 
   void _showNewsMenuSheet() {
-    // 임시로 지정된 현재 사용자 이름과 가게 이름을 비교합니다.
     bool isOwner = _currentUserName == '맛집 파스타';
-
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -204,7 +203,11 @@ class _StoreNewsDetailScreenState extends State<StoreNewsDetailScreen> {
       children: [
         InkWell(
           onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => StoreDetailScreen(storeData: _storeData)));
+            // --- 🔥🔥🔥 수정된 부분 ---
+            final storeId = _storeData['id'] as String?;
+            if (storeId != null) {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => StoreDetailScreen(storeId: storeId)));
+            }
           },
           child: Row(
             children: [

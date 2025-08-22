@@ -1,4 +1,4 @@
-// 📁 lib/src/screens/nfc_registration_screen.dart (UX 개선 최종본)
+// 📁 lib/src/screens/nfc_registration_screen.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +6,7 @@ import 'package:nfc_manager/nfc_manager.dart';
 import 'package:spotter/services/mode_prefs.dart';
 import 'package:spotter/src/screens/owner/store_owner_main_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:spotter/utils/nfc_utils.dart'; // 🔥🔥🔥 새로 만든 유틸리티를 임포트합니다.
 
 class NfcRegistrationScreen extends StatefulWidget {
   final String applicationId;
@@ -20,8 +21,7 @@ class NfcRegistrationScreen extends StatefulWidget {
 }
 
 class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
-  // UI 상태를 관리하기 위한 변수들
-  bool _isScanning = false; // 스캔 시작 여부
+  bool _isScanning = false;
   String _statusMessage = '가게 승인이 완료되었습니다.';
   String _subStatusMessage = '배송된 NFC 스탬프를 아래 버튼을 눌러 등록을 시작해주세요.';
   IconData _statusIcon = Icons.store_mall_directory_rounded;
@@ -35,7 +35,6 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
   }
 
   void _startNfcScan() async {
-    // 스캔 시작 상태로 UI 변경
     setState(() {
       _isScanning = true;
       _updateStatus('NFC를 휴대폰 뒷면에 태그해주세요.', Icons.nfc, Colors.blue);
@@ -50,15 +49,11 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
     NfcManager.instance.startSession(
       onDiscovered: (NfcTag tag) async {
         try {
-          final ndef = Ndef.from(tag);
-          if (ndef == null) {
-            _updateStatus('NDEF 형식이 아닌 태그입니다.', Icons.warning, Colors.orange);
-            await NfcManager.instance.stopSession();
-            return;
+          // --- 🔥🔥🔥 새로운 NFC ID 인식 로직을 사용합니다. ---
+          final tagId = getConsistentNfcId(tag);
+          if (tagId == null) {
+            throw Exception('NFC 태그 ID를 읽을 수 없습니다.');
           }
-
-          final identifier = tag.data['ndef']['identifier'];
-          final tagId = identifier.map((e) => e.toRadixString(16).padLeft(2, '0')).join('');
 
           _updateStatus('태그 감지 완료!\n데이터베이스 등록 중...', Icons.wifi_tethering, Colors.blue);
 
@@ -96,7 +91,7 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
     if (mounted) {
       setState(() {
         _statusMessage = message;
-        _subStatusMessage = ''; // 스캔 시작 후에는 서브 메시지 없음
+        _subStatusMessage = '';
         _statusIcon = icon;
         _statusColor = color;
         _isRegistrationComplete = isComplete;
@@ -134,8 +129,6 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
                   ),
                 ),
               const SizedBox(height: 48),
-
-              // UI 로직: 상태에 따라 다른 버튼을 보여줍니다.
               if (_isRegistrationComplete)
                 ElevatedButton(
                   onPressed: () {
@@ -157,7 +150,7 @@ class _NfcRegistrationScreenState extends State<NfcRegistrationScreen> {
                 )
               else if (!_isScanning)
                 ElevatedButton(
-                  onPressed: _startNfcScan, // 버튼을 눌러야만 스캔이 시작됩니다.
+                  onPressed: _startNfcScan,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
                     foregroundColor: Colors.white,

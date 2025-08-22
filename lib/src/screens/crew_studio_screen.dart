@@ -87,7 +87,6 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
             crossAxisSpacing: 16,
             childAspectRatio: 1.2,
             children: [
-              // --- 형님의 요청대로 수정된 부분 ---
               _InfoCard(icon: Icons.arrow_upward, title: '나의 레벨', value: userProfile.levelTitle, color: Colors.green),
               _InfoCard(icon: Icons.flash_on, title: '경험치(XP)', value: '${userProfile.xp}', color: Colors.orange),
               _InfoCard(icon: Icons.business_center_outlined, title: '진행중인 스폰서쉽', value: '0', color: Colors.blue),
@@ -104,14 +103,15 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
 
   Widget _buildRegularStoresTab() {
     final regularStores = [
-      { 'name': '카페 스프링', 'category': '카페', 'seed': 'cafe', 'storeData': { 'storeName': '카페 스프링', 'regulars': 98, 'seed': 'cafe', 'category': '카페', 'description': '신선한 원두와 함께하는 여유', 'address': '대구시 수성구' } },
-      { 'name': '클린 세탁소', 'category': '서비스', 'seed': 'laundry', 'storeData': { 'storeName': '클린 세탁소', 'regulars': 75, 'seed': 'laundry', 'category': '서비스', 'description': '깨끗함의 차이를 느껴보세요.', 'address': '대구시 동구' } }
+      { 'name': '카페 스프링', 'category': '카페', 'seed': 'cafe', 'storeData': { 'id': 'temp_cafe_id_01', 'storeName': '카페 스프링', 'regulars': 98, 'seed': 'cafe', 'category': '카페', 'description': '신선한 원두와 함께하는 여유', 'address': '대구시 수성구' } },
+      { 'name': '클린 세탁소', 'category': '서비스', 'seed': 'laundry', 'storeData': { 'id': 'temp_laundry_id_01', 'storeName': '클린 세탁소', 'regulars': 75, 'seed': 'laundry', 'category': '서비스', 'description': '깨끗함의 차이를 느껴보세요.', 'address': '대구시 동구' } }
     ];
     return ListView.builder(
       padding: const EdgeInsets.all(16.0),
       itemCount: regularStores.length,
       itemBuilder: (context, index) {
         final store = regularStores[index];
+        final storeData = store['storeData'] as Map<String, dynamic>;
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -119,7 +119,11 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
           shadowColor: Colors.black12,
           child: InkWell(
             onTap: () {
-              Navigator.push( context, MaterialPageRoute( builder: (context) => StoreDetailScreen( storeData: store['storeData'] as Map<String, dynamic>, ), ), );
+              // --- 🔥🔥🔥 수정된 부분 ---
+              final storeId = storeData['id'] as String?;
+              if (storeId != null) {
+                Navigator.push( context, MaterialPageRoute( builder: (context) => StoreDetailScreen( storeId: storeId ), ), );
+              }
             },
             borderRadius: BorderRadius.circular(12),
             child: Padding(
@@ -209,14 +213,25 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
   }
 
   Widget _buildStoreRankingList(BuildContext context) {
-    final rankings = [ { 'name': '맛집 파스타', 'metric': '단골 127명', 'seed': 'pasta', 'storeData': {'storeName': '맛집 파스타', 'regulars': 127, 'seed': 'pasta'}}, { 'name': '카페 스프링', 'metric': '단골 98명', 'seed': 'cafe', 'storeData': {'storeName': '카페 스프링', 'regulars': 98, 'seed': 'cafe'}}, { 'name': '클린 세탁소', 'metric': '단골 75명', 'seed': 'laundry', 'storeData': {'storeName': '클린 세탁소', 'regulars': 75, 'seed': 'laundry'}}, ];
+    final rankings = [
+      { 'name': '맛집 파스타', 'metric': '단골 127명', 'seed': 'pasta', 'storeData': {'id': '6PdcdJAiNqVpZ9DDvtY0itRGYBP2', 'storeName': '맛집 파스타', 'regulars': 127, 'seed': 'pasta'}},
+      { 'name': '카페 스프링', 'metric': '단골 98명', 'seed': 'cafe', 'storeData': {'id': 'temp_cafe_id_02', 'storeName': '카페 스프링', 'regulars': 98, 'seed': 'cafe'}},
+      { 'name': '클린 세탁소', 'metric': '단골 75명', 'seed': 'laundry', 'storeData': {'id': 'temp_laundry_id_02', 'storeName': '클린 세탁소', 'regulars': 75, 'seed': 'laundry'}},
+    ];
     return ListView.builder(
       padding: const EdgeInsets.only(top: 8),
       itemCount: rankings.length,
       physics: const NeverScrollableScrollPhysics(),
       itemBuilder: (context, index) {
+        final storeData = rankings[index]['storeData'] as Map<String, dynamic>;
         return ListTile(
-          onTap: () => Navigator.push( context, MaterialPageRoute( builder: (context) => StoreDetailScreen( storeData: rankings[index]['storeData'] as Map<String, dynamic>, ), ), ),
+          // --- 🔥🔥🔥 수정된 부분 ---
+          onTap: () {
+            final storeId = storeData['id'] as String?;
+            if (storeId != null) {
+              Navigator.push( context, MaterialPageRoute( builder: (context) => StoreDetailScreen( storeId: storeId ), ), );
+            }
+          },
           leading: Text('${index + 1}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange)),
           title: Text(rankings[index]['name'] as String, style: const TextStyle(fontWeight: FontWeight.bold)),
           subtitle: Text(rankings[index]['metric'] as String),

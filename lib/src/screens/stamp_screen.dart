@@ -1,7 +1,11 @@
+// 📁 lib/src/screens/stamp_screen.dart
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:spotter/src/screens/coupon_redemption_screen.dart';
 import 'package:spotter/src/screens/find_stamps_screen.dart';
-import 'package:spotter/src/screens/ongoing_stamps_screen.dart';
+import 'package:spotter/src/screens/ongoing_stamps_screen.dart'; // 🔥🔥🔥 상세 페이지 임포트
 import 'package:spotter/src/screens/ongoing_tours_screen.dart';
 
 class StampScreen extends StatefulWidget {
@@ -12,19 +16,24 @@ class StampScreen extends StatefulWidget {
 }
 
 class _StampScreenState extends State<StampScreen> with TickerProviderStateMixin {
-  late final TabController _tabController;
+  late final TabController _journeyTabController;
+  late final TabController _couponTabController;
+  final String _currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _journeyTabController = TabController(length: 2, vsync: this);
+    _couponTabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _journeyTabController.dispose();
+    _couponTabController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -57,7 +66,7 @@ class _StampScreenState extends State<StampScreen> with TickerProviderStateMixin
   Widget _buildStampJourneyCard(BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(16.0),
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.symmetric(vertical: 24.0),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16.0),
         color: Colors.orange[400],
@@ -65,21 +74,54 @@ class _StampScreenState extends State<StampScreen> with TickerProviderStateMixin
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "스포터님의 스탬프 여정",
-            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24.0),
+            child: Text(
+              "스포터님의 스탬프 여정",
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
           ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildJourneyStat(context, '2', '진행중인 스탬프', () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const OngoingStampsScreen()));
-              }),
-              _buildJourneyStat(context, '2', '진행중인 투어', () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => const OngoingToursScreen()));
-              }),
+          const SizedBox(height: 16),
+          TabBar(
+            controller: _journeyTabController,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white.withOpacity(0.7),
+            indicator: const UnderlineTabIndicator(
+              borderSide: BorderSide(width: 3, color: Colors.white),
+              insets: EdgeInsets.symmetric(horizontal: 16.0),
+            ),
+            tabs: const [
+              Tab(text: '진행중인 스탬프'),
+              Tab(text: '진행중인 투어'),
             ],
+          ),
+          SizedBox(
+            height: 100,
+            child: TabBarView(
+              controller: _journeyTabController,
+              children: [
+                StreamBuilder<QuerySnapshot>(
+                  // --- 🔥🔥🔥 수정된 부분: '횟수형' 리워드만 필터링합니다. ---
+                    stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(_currentUserId)
+                        .collection('ongoing_rewards')
+                        .where('rewardData.conditionType', isEqualTo: 'visitCount')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      final count = snapshot.data?.size ?? 0;
+                      return _buildJourneyStat(
+                          context,
+                          count.toString(),
+                          '진행중인 스탬프',
+                          // --- 🔥🔥🔥 수정된 부분: 상세 페이지로 이동시킵니다. ---
+                              () => Navigator.push(context, MaterialPageRoute(builder: (context) => const OngoingStampsScreen()))
+                      );
+                    }
+                ),
+                _buildJourneyStat(context, '0', '진행중인 투어', () => Navigator.push(context, MaterialPageRoute(builder: (context) => const OngoingToursScreen()))),
+              ],
+            ),
           ),
         ],
       ),
@@ -90,6 +132,7 @@ class _StampScreenState extends State<StampScreen> with TickerProviderStateMixin
     return GestureDetector(
       onTap: onTap,
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(count, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
@@ -118,49 +161,78 @@ class _StampScreenState extends State<StampScreen> with TickerProviderStateMixin
               toolbarHeight: 48,
               backgroundColor: Theme.of(context).cardColor,
               flexibleSpace: TabBar(
-                controller: _tabController,
+                controller: _couponTabController,
                 labelColor: Colors.orange[600],
                 unselectedLabelColor: Colors.grey[600],
                 indicator: UnderlineTabIndicator(
                   borderSide: BorderSide(width: 3, color: Colors.orange[600]!),
                 ),
                 tabs: const [
-                  Tab(text: '사용 가능 (2)'),
-                  Tab(text: '사용 완료 (1)'),
+                  Tab(text: '사용 가능'),
+                  Tab(text: '사용 완료'),
                 ],
               ),
             ),
           ),
           SizedBox(
-            height: 200,
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildCouponList(true),
-                _buildCouponList(false),
-              ],
+            height: 220,
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(_currentUserId)
+                  .collection('coupons')
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('쿠폰을 불러오는 중 오류가 발생했습니다: ${snapshot.error}'));
+                }
+
+                final docs = snapshot.data?.docs ?? [];
+                final available = docs.where((d) {
+                  final m = d.data() as Map<String, dynamic>;
+                  return m['usedAt'] == null;
+                }).toList();
+
+                final used = docs.where((d) {
+                  final m = d.data() as Map<String, dynamic>;
+                  return m['usedAt'] != null;
+                }).toList();
+
+                return TabBarView(
+                  controller: _couponTabController,
+                  children: [
+                    _buildCouponListFromDocs(available, isAvailable: true),
+                    _buildCouponListFromDocs(used, isAvailable: false),
+                  ],
+                );
+              },
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildCouponList(bool isAvailable) {
-    final availableCoupons = [
-      {'store': '카페 스프링', 'reward': '아메리카노 1잔 무료', 'expiry': '2025-12-31', 'seed': 'cafe'},
-      {'store': '맛집 파스타', 'reward': '고르곤졸라 피자', 'expiry': '2025-11-30', 'seed': 'pasta'},
-    ];
-    final usedCoupons = [
-      {'store': '헬스 클럽', 'reward': '프로틴 쉐이크 증정', 'expiry': '2025-07-15', 'seed': 'gym'},
-    ];
-    final coupons = isAvailable ? availableCoupons : usedCoupons;
+  Widget _buildCouponListFromDocs(List<QueryDocumentSnapshot> coupons, {required bool isAvailable}) {
+    if (coupons.isEmpty) {
+      return Center(child: Text(isAvailable ? '사용 가능한 쿠폰이 없습니다.' : '사용한 쿠폰이 없습니다.'));
+    }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: coupons.length,
       itemBuilder: (context, index) {
-        final coupon = coupons[index];
+        final doc = coupons[index];
+        final data = doc.data() as Map<String, dynamic>;
+        final rewardData = data['rewardData'] as Map<String, dynamic>? ?? {};
+        final expiryDate = (data['createdAt'] as Timestamp?)
+            ?.toDate()
+            .add(Duration(days: rewardData['expiryDays'] ?? 30));
+
         return Card(
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -174,24 +246,40 @@ class _StampScreenState extends State<StampScreen> with TickerProviderStateMixin
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.network('https://picsum.photos/seed/${coupon['seed']}/100/100', width: 60, height: 60, fit: BoxFit.cover),
+                  child: Image.network(
+                    rewardData['imageUrl'] ?? 'https://picsum.photos/seed/${data['storeId']}/100/100',
+                    width: 60, height: 60, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(width: 60, height: 60, color: Colors.grey[200]),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(coupon['reward']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(rewardData['title'] ?? '리워드', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 2),
-                      Text(coupon['store']!, style: TextStyle(color: Colors.grey[600])),
+                      Text(rewardData['storeName'] ?? '가게', style: TextStyle(color: Colors.grey[600])),
                       const SizedBox(height: 4),
-                      Text('유효기간: ~${coupon['expiry']}', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                      if (isAvailable && expiryDate != null)
+                        Text('유효기간: ~${expiryDate.toLocal().toString().substring(0, 10)}',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                     ],
                   ),
                 ),
                 if (isAvailable)
                   ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CouponRedemptionScreen(
+                            couponId: doc.id,
+                            storeId: data['storeId'],
+                          ),
+                        ),
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange[400],
                       foregroundColor: Colors.white,
@@ -210,69 +298,6 @@ class _StampScreenState extends State<StampScreen> with TickerProviderStateMixin
   }
 
   Widget _buildMyStampCollectionSection(BuildContext context) {
-    final collections = [
-      {'name': '카페 스프링', 'date': '2024-05-20', 'seed': 'cafe1'},
-      {'name': '헬스 클럽', 'date': '2024-05-19', 'seed': 'gym'},
-      {'name': '맛집 파스타', 'date': '2024-05-18', 'seed': 'pasta'},
-      {'name': '요가 스튜디오', 'date': '2024-05-17', 'seed': 'yoga'},
-      {'name': '헬스 클럽', 'date': '2024-05-15', 'seed': 'gym2'},
-    ];
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("📚 나의 스탬프 컬렉션 (5)", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: collections.length + 1,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.75,
-            ),
-            itemBuilder: (context, index) {
-              if (index == collections.length) {
-                return _buildAddStampCard();
-              }
-              final item = collections[index];
-              return _buildStampCollectionCard(item);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStampCollectionCard(Map<String, String> item) {
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 40,
-          backgroundImage: NetworkImage('https://picsum.photos/seed/${item['seed']}/150/150'),
-        ),
-        const SizedBox(height: 8),
-        Text(item['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13), textAlign: TextAlign.center),
-        const SizedBox(height: 2),
-        Text(item['date']!, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-      ],
-    );
-  }
-
-  Widget _buildAddStampCard() {
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 40,
-          backgroundColor: Colors.grey[200],
-          child: Icon(Icons.add, size: 30, color: Colors.grey[600]),
-        ),
-        const SizedBox(height: 8),
-        Text('스탬프 추가', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-      ],
-    );
+    return const SizedBox.shrink();
   }
 }
