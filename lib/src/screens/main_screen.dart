@@ -25,32 +25,20 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
   late List<Widget> _pages;
-  // _allFeedItems는 HomeScreen으로 전달되므로, 여기서는 더 이상 필요하지 않습니다.
-  // late List<Map<String, dynamic>> _allFeedItems;
 
   @override
   void initState() {
     super.initState();
     final currentUserMap = widget.currentUserProfile.toMap();
 
-    // --- 🔥🔥🔥 수정된 부분: 페이지 목록을 5개로 정확하게 맞춥니다. ---
     _pages = [
-      // 페이지 0: 홈
-      HomeScreen(
-        feedItems: const [], // 피드 데이터는 HomeScreen 자체에서 불러오는 것이 좋습니다.
-        onDelete: (id) {},
-        currentUser: currentUserMap,
-      ),
-      // 페이지 1: 커뮤니티
+      // --- 🔥🔥🔥 수정된 부분: HomeScreen이 스스로 데이터를 가져오도록 변경 ---
+      HomeScreen(currentUser: currentUserMap),
       CommunityScreen(currentUser: currentUserMap),
-      // 페이지 2: 스탬프
       const StampScreen(),
-      // 페이지 3: 피드작성 (IndexedStack용 빈 컨테이너, 실제 화면은 onTap에서 처리)
-      Container(),
-      // 페이지 4: 마이페이지
+      Container(), // 피드 작성 탭을 위한 빈 컨테이너
       MyPageScreen(
         currentUserProfile: widget.currentUserProfile,
-        onProfileUpdated: _updateProfile,
       ),
     ];
 
@@ -64,19 +52,12 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _onNavigate() {
-    // 탭 인덱스가 범위 내에 있을 때만 상태를 변경합니다.
-    if (mounted && mainScreenNavigator.value >= 0 && mainScreenNavigator.value < _pages.length) {
+    if (mounted && mainScreenNavigator.value >= 0 && mainScreenNavigator.value < 5 && mainScreenNavigator.value != 3) {
       _onItemTapped(mainScreenNavigator.value);
     }
   }
 
-  void _updateProfile(Map<String, String> newProfile) {
-    // TODO: Firestore users 컬렉션 업데이트 로직 필요
-    print("프로필 업데이트: $newProfile");
-  }
-
   void _onItemTapped(int index) {
-    // 탭 인덱스 3이 피드 작성이므로 분기 처리
     if (index == 3) {
       Navigator.push(
         context,

@@ -6,6 +6,7 @@ import 'package:spotter/src/screens/store_news_detail_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:spotter/src/screens/user_nfc_scan_screen.dart';
+import 'package:spotter/src/widgets/post_grid_item.dart';
 
 class StoreDetailScreen extends StatefulWidget {
   final String storeId;
@@ -31,7 +32,6 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
     }
   }
 
-  // --- 🔥🔥🔥 수정된 부분: Firestore 기록 로직을 제거하고, 네비게이션 역할만 수행합니다. ---
   Future<void> _startChallenge() async {
     if (_selectedRewardId == null || _currentUserId.isEmpty) return;
 
@@ -42,7 +42,6 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
       }
 
       if (mounted) {
-        // 챌린지 생성 없이, 필요한 정보만 가지고 NFC 스캔 화면으로 이동합니다.
         Navigator.push(context, MaterialPageRoute(builder: (context) => UserNfcScanScreen(
           storeId: widget.storeId,
           rewardId: _selectedRewardId!,
@@ -253,28 +252,36 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
   }
 
   Widget _buildPhotoGrid(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network('https://picsum.photos/seed/laundry_feed/400/400', fit: BoxFit.cover),
-            ),
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('posts')
+          .where('storeId', isEqualTo: widget.storeId)
+          .where('isCertified', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Text('아직 방문객 인증샷이 없습니다.');
+        }
+        final docs = snapshot.data!.docs;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.zero,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8,
           ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network('https://picsum.photos/seed/pasta_feed_my/400/400', fit: BoxFit.cover),
-            ),
-          ),
-        ),
-      ],
+          itemCount: docs.length > 6 ? 6 : docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final itemWithId = {...data, 'id': docs[index].id};
+            return PostGridItem(post: itemWithId);
+          },
+        );
+      },
     );
   }
 

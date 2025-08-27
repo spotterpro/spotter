@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:spotter/models/user_model.dart';
 import 'package:spotter/src/widgets/feed_card.dart';
+import 'package:spotter/src/widgets/post_grid_item.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -34,35 +35,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
     super.dispose();
   }
 
-  Future<void> _deletePost(String postId) async {
+  Future<void> _deletePost(String postId, String collection) async {
     try {
-      await FirebaseFirestore.instance.collection('posts').doc(postId).delete();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('게시물이 삭제되었습니다.')),
-        );
-      }
+      await FirebaseFirestore.instance.collection(collection).doc(postId).delete();
     } catch (e) {
       // Handle error
     }
   }
 
-  Future<void> _updatePost(String postId, String newCaption, List<String> newTags) async {
+  Future<void> _updatePost(String postId, String newCaption, List<String> newTags, String collection) async {
     try {
-      await FirebaseFirestore.instance.collection('posts').doc(postId).update({
+      await FirebaseFirestore.instance.collection(collection).doc(postId).update({
         'caption': newCaption,
         'tags': newTags,
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('게시물이 수정되었습니다.')),
-        );
-      }
     } catch (e) {
       // Handle error
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -113,7 +103,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
                       indicatorSize: TabBarIndicatorSize.tab,
                       indicator: UnderlineTabIndicator(borderSide: BorderSide(width: 3, color: primary)),
                       tabs: const [
-                        Tab(text: '인증 피드'),
+                        Tab(text: '피드'),
                         Tab(text: '작성한 글'),
                       ],
                     ),
@@ -124,8 +114,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
             body: TabBarView(
               controller: _tabController,
               children: [
-                _buildUserFeeds(isCertified: true),
-                _buildUserFeeds(isCertified: false, currentUser: currentUserMap),
+                _buildAllPostsFeed(currentUser: currentUserMap),
+                _buildCommunityPostsFeed(currentUser: currentUserMap),
               ],
             ),
           ),
@@ -154,9 +144,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
                   children: [
                     Text(userProfile.userName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    // --- 형님의 요청대로 수정된 부분 ---
                     Text(
-                      userProfile.levelTitle, // 레벨만 표시
+                      userProfile.levelTitle,
                       style: const TextStyle(color: Colors.grey, fontSize: 14),
                     ),
                   ],
@@ -170,7 +159,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
             children: [
               _ProfileStat(count: '${userProfile.crewCount}', label: '크루원'),
               _ProfileStat(count: '${userProfile.myCrewCount}', label: '나의 크루'),
-              // --- 형님의 요청대로 수정된 부분 ---
               _ProfileStat(count: userProfile.influenceTitle, label: '칭호'),
             ],
           ),
@@ -182,58 +170,69 @@ class _UserProfileScreenState extends State<UserProfileScreen> with TickerProvid
     );
   }
 
-  Widget _buildUserFeeds({required bool isCertified, Map<String, dynamic>? currentUser}) {
+  Widget _buildAllPostsFeed({required Map<String, dynamic> currentUser}) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('posts')
           .where('author.uid', isEqualTo: widget.userId)
-          .where('isCertified', isEqualTo: isCertified)
-          .orderBy('time', descending: true)
+          .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(child: Text(isCertified ? '작성한 인증 피드가 없습니다.' : '작성한 글이 없습니다.'));
+          return const Center(child: Text('작성한 피드가 없습니다.'));
         }
         final docs = snapshot.data!.docs;
+        return GridView.builder(
+          padding: const EdgeInsets.all(2.0),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 2.0,
+            mainAxisSpacing: 2.0,
+          ),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final itemWithId = {...data, 'id': docs[index].id};
+            return PostGridItem(post: itemWithId);
+          },
+        );
+      },
+    );
+  }
 
-        if (isCertified) {
-          return GridView.builder(
-            padding: const EdgeInsets.all(8),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8,
-            ),
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final data = docs[index].data() as Map<String, dynamic>;
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: data['postImageSeed'] != null ? Image.network(
-                  'https://picsum.photos/seed/${data['postImageSeed']}/300/300',
-                  fit: BoxFit.cover,
-                ) : Container(color: Colors.grey[300]),
-              );
-            },
-          );
-        } else {
-          return ListView.builder(
-            padding: EdgeInsets.zero,
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final data = docs[index].data() as Map<String, dynamic>;
-              final itemWithId = {...data, 'id': docs[index].id};
-              return FeedCard(
-                key: ValueKey(itemWithId['id']),
-                item: itemWithId,
-                onDelete: () => _deletePost(itemWithId['id']),
-                onUpdate: (caption, tags) => _updatePost(itemWithId['id'], caption, tags),
-                currentUser: currentUser!,
-              );
-            },
-          );
+  Widget _buildCommunityPostsFeed({required Map<String, dynamic> currentUser}) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('community_posts')
+          .where('author.uid', isEqualTo: widget.userId)
+          .orderBy('createdAt', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
         }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(child: Text('작성한 커뮤니티 글이 없습니다.'));
+        }
+        final docs = snapshot.data!.docs;
+        return ListView.builder(
+          padding: EdgeInsets.zero,
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data() as Map<String, dynamic>;
+            final itemWithId = {...data, 'id': docs[index].id};
+            return FeedCard(
+              key: ValueKey(itemWithId['id']),
+              item: itemWithId,
+              onDelete: () => _deletePost(itemWithId['id'], 'community_posts'),
+              onUpdate: (caption, tags) => _updatePost(itemWithId['id'], caption, tags, 'community_posts'),
+              currentUser: currentUser,
+            );
+          },
+        );
       },
     );
   }

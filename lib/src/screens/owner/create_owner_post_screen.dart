@@ -13,9 +13,9 @@ class CreateOwnerPostScreen extends StatefulWidget {
 
 class _CreateOwnerPostScreenState extends State<CreateOwnerPostScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
+  // --- 🔥🔥🔥 수정된 부분: 제목 컨트롤러 제거 ---
   final _bodyController = TextEditingController();
-  final _tagsController = TextEditingController(); // 해시태그 컨트롤러 추가
+  final _tagsController = TextEditingController();
   String? _selectedCategory;
   bool _isLoading = false;
 
@@ -28,9 +28,8 @@ class _CreateOwnerPostScreenState extends State<CreateOwnerPostScreen> {
 
   @override
   void dispose() {
-    _titleController.dispose();
     _bodyController.dispose();
-    _tagsController.dispose(); // dispose 추가
+    _tagsController.dispose();
     super.dispose();
   }
 
@@ -54,24 +53,22 @@ class _CreateOwnerPostScreenState extends State<CreateOwnerPostScreen> {
     }
 
     try {
-      // --- 🔥🔥🔥 수정된 부분: 작성자 프로필 정보와 가게 정보를 함께 가져옵니다. ---
-      final userProfileDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      final userImageSeed = userProfileDoc.data()?['userImageSeed'] ?? user.uid;
-
       final storeDoc = await FirebaseFirestore.instance.collection('stores').doc(user.uid).get();
-      final storeName = storeDoc.data()?['storeName'] ?? '가게 정보 없음';
+      final storeData = storeDoc.data();
+      final storeName = storeData?['storeName'] ?? '가게 정보 없음';
+      final authorImageUrl = storeData?['imageUrl'];
+      final userName = storeDoc.data()?['ownerName'] ?? '사장님';
 
-      // 해시태그 파싱
-      final tags = _tagsController.text.trim().split(' ').where((tag) => tag.startsWith('#') && tag.length > 1).toList();
+      final tags = _tagsController.text.trim().split(' ').where((tag) => tag.startsWith('#') && tag.length > 1).map((tag) => tag.substring(1)).toList();
 
       await FirebaseFirestore.instance.collection('owner_posts').add({
-        'title': _titleController.text.trim(),
+        // --- 🔥🔥🔥 수정된 부분: title 필드 제거 ---
         'body': _bodyController.text.trim(),
-        'tags': tags, // 해시태그 추가
+        'tags': tags,
         'category': _selectedCategory,
         'authorUid': user.uid,
-        'authorName': userProfileDoc.data()?['userName'] ?? '사장님',
-        'authorImageSeed': userImageSeed, // 프로필 사진 시드 추가
+        'authorName': userName,
+        'authorStoreImageUrl': authorImageUrl,
         'storeName': storeName,
         'createdAt': FieldValue.serverTimestamp(),
         'likeCount': 0,
@@ -118,13 +115,13 @@ class _CreateOwnerPostScreenState extends State<CreateOwnerPostScreen> {
           children: [
             const Text('카테고리', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            // --- 🔥🔥🔥 수정된 부분: 드롭다운을 버튼형 UI로 변경 ---
             Wrap(
               spacing: 8.0,
               children: _categories.map((category) {
+                final isSelected = _selectedCategory == category['value'];
                 return ChoiceChip(
                   label: Text(category['label']!),
-                  selected: _selectedCategory == category['value'],
+                  selected: isSelected,
                   onSelected: (selected) {
                     if (selected) {
                       setState(() {
@@ -133,20 +130,15 @@ class _CreateOwnerPostScreenState extends State<CreateOwnerPostScreen> {
                     }
                   },
                   selectedColor: Colors.orange,
-                  labelStyle: TextStyle(color: _selectedCategory == category['value'] ? Colors.white : Colors.black),
+                  labelStyle: TextStyle(color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color),
+                  backgroundColor: Theme.of(context).dividerColor.withOpacity(0.1),
+                  shape: StadiumBorder(side: BorderSide(color: isSelected ? Colors.orange : Colors.grey.shade300)),
+                  showCheckmark: false,
                 );
               }).toList(),
             ),
             const SizedBox(height: 24),
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: '제목',
-              ),
-              validator: (value) => (value == null || value.isEmpty) ? '제목을 입력해주세요.' : null,
-            ),
-            const SizedBox(height: 16),
+            // --- 🔥🔥🔥 수정된 부분: 제목 입력란 제거 ---
             TextFormField(
               controller: _bodyController,
               decoration: const InputDecoration(
@@ -154,11 +146,10 @@ class _CreateOwnerPostScreenState extends State<CreateOwnerPostScreen> {
                 labelText: '내용',
                 alignLabelWithHint: true,
               ),
-              maxLines: 10,
+              maxLines: 15,
               validator: (value) => (value == null || value.isEmpty) ? '내용을 입력해주세요.' : null,
             ),
             const SizedBox(height: 16),
-            // --- 🔥🔥🔥 수정된 부분: 해시태그 입력란 추가 ---
             TextFormField(
               controller: _tagsController,
               decoration: const InputDecoration(

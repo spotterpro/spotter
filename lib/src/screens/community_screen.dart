@@ -32,9 +32,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
     setState(() { _isLoadingTags = true; });
     try {
       final postsSnapshot = await FirebaseFirestore.instance
-          .collection('posts')
-          .where('isCertified', isEqualTo: false)
-          .orderBy('time', descending: true)
+          .collection('community_posts')
+          .orderBy('createdAt', descending: true)
           .limit(100)
           .get();
 
@@ -50,74 +49,65 @@ class _CommunityScreenState extends State<CommunityScreen> {
       final sortedTags = tagCounts.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
 
-      final top3Tags = sortedTags.take(3).map((e) => e.key).toList();
+      final top3Tags = sortedTags.take(3).map((e) => '#${e.key}').toList();
 
-      setState(() {
-        _tags = ['#전체', '🔥 주간 인기글', ...top3Tags];
-      });
+      if (mounted) {
+        setState(() {
+          _tags = ['#전체', '🔥 주간 인기글', ...top3Tags];
+        });
+      }
     } catch (e) {
       print("트렌드 태그 로딩 실패: $e");
     } finally {
-      setState(() { _isLoadingTags = false; });
+      if (mounted) {
+        setState(() { _isLoadingTags = false; });
+      }
     }
   }
 
   Query _buildQuery() {
-    Query query = FirebaseFirestore.instance
-        .collection('posts')
-        .where('isCertified', isEqualTo: false);
+    Query query = FirebaseFirestore.instance.collection('community_posts');
 
     if (_selectedTagIndex == 0) {
-      return query.orderBy('time', descending: true);
+      return query.orderBy('createdAt', descending: true);
     }
     else if (_selectedTagIndex == 1) {
       final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
       return query
-          .where('time', isGreaterThanOrEqualTo: Timestamp.fromDate(sevenDaysAgo))
-          .orderBy('time', descending: true)
+          .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(sevenDaysAgo))
+          .orderBy('createdAt', descending: true)
           .orderBy('likeCount', descending: true);
     }
     else {
-      final selectedTag = _tags[_selectedTagIndex];
+      final selectedTag = _tags[_selectedTagIndex].replaceAll('#', '');
       return query
           .where('tags', arrayContains: selectedTag)
-          .orderBy('time', descending: true);
+          .orderBy('createdAt', descending: true);
     }
   }
 
   Future<void> _deletePost(String postId) async {
     try {
-      await FirebaseFirestore.instance.collection('posts').doc(postId).delete();
+      await FirebaseFirestore.instance.collection('community_posts').doc(postId).delete();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('게시물이 삭제되었습니다.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('게시물이 삭제되었습니다.')));
       }
-    } catch (e) {
+    } catch(e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('삭제 중 오류가 발생했습니다: $e'), backgroundColor: Colors.red),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('삭제 중 오류 발생: $e')));
       }
     }
   }
 
   Future<void> _updatePost(String postId, String newCaption, List<String> newTags) async {
     try {
-      await FirebaseFirestore.instance.collection('posts').doc(postId).update({
+      await FirebaseFirestore.instance.collection('community_posts').doc(postId).update({
         'caption': newCaption,
         'tags': newTags,
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('게시물이 수정되었습니다.')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('수정 중 오류가 발생했습니다: $e'), backgroundColor: Colors.red),
-        );
+    } catch(e) {
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('수정 중 오류 발생: $e')));
       }
     }
   }
@@ -197,7 +187,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       item: itemWithId,
                       onDelete: () => _deletePost(itemWithId['id']),
                       onUpdate: (caption, tags) => _updatePost(itemWithId['id'], caption, tags),
-                      currentUser: widget.currentUser, // 수정된 부분
+                      currentUser: widget.currentUser,
                     );
                   },
                   separatorBuilder: (context, index) => const SizedBox(height: 8),

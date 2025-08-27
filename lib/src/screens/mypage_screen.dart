@@ -8,17 +8,15 @@ import 'package:spotter/models/user_model.dart';
 import 'package:spotter/src/screens/crew_studio_screen.dart';
 import 'package:spotter/src/screens/my_growth_log_screen.dart';
 import 'package:spotter/src/screens/settings_screen.dart';
-// import 'package:spotter/src/screens/user_profile_screen.dart'; // UserProfileScreen은 현재 사용되지 않으므로 주석 처리하거나 삭제하셔도 됩니다.
 import 'package:spotter/src/widgets/feed_card.dart';
+import 'package:spotter/src/widgets/post_grid_item.dart';
 
 class MyPageScreen extends StatefulWidget {
   final UserProfile currentUserProfile;
-  final Function(Map<String, String>) onProfileUpdated;
 
   const MyPageScreen({
     super.key,
     required this.currentUserProfile,
-    required this.onProfileUpdated,
   });
 
   @override
@@ -41,9 +39,9 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
     super.dispose();
   }
 
-  Future<void> _deletePost(String postId) async {
+  Future<void> _deletePost(String postId, String collection) async {
     try {
-      await FirebaseFirestore.instance.collection('posts').doc(postId).delete();
+      await FirebaseFirestore.instance.collection(collection).doc(postId).delete();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('게시물이 삭제되었습니다.')),
@@ -58,9 +56,9 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
     }
   }
 
-  Future<void> _updatePost(String postId, String newCaption, List<String> newTags) async {
+  Future<void> _updatePost(String postId, String newCaption, List<String> newTags, String collection) async {
     try {
-      await FirebaseFirestore.instance.collection('posts').doc(postId).update({
+      await FirebaseFirestore.instance.collection(collection).doc(postId).update({
         'caption': newCaption,
         'tags': newTags,
       });
@@ -85,7 +83,7 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
         stream: FirebaseFirestore.instance.collection('users').doc(_currentUserId).snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
 
           final userProfile = UserProfile.fromDocument(snapshot.data!);
@@ -102,14 +100,8 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
                     delegate: _TabBarDelegate(
                       TabBar(
                         controller: _tabController,
-                        isScrollable: false,
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        indicator: UnderlineTabIndicator(
-                          borderSide: BorderSide(width: 3, color: primary),
-                        ),
-                        labelStyle: const TextStyle(fontWeight: FontWeight.w700),
                         tabs: const [
-                          Tab(text: '인증 피드'),
+                          Tab(text: '피드'),
                           Tab(text: '작성한 글'),
                         ],
                       ),
@@ -120,8 +112,8 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
               body: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildCertifiedFeed(),
-                  _buildWrittenPosts(userProfile),
+                  _buildAllPostsFeed(),
+                  _buildCommunityPostsFeed(userProfile),
                 ],
               ),
             ),
@@ -167,7 +159,7 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
                     MaterialPageRoute(
                       builder: (context) => SettingsScreen(
                         currentUser: userProfile.toMap(),
-                        onProfileUpdated: widget.onProfileUpdated,
+                        onProfileUpdated: (updatedProfile) {},
                       ),
                     ),
                   );
@@ -220,7 +212,6 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
             ],
           ),
           const SizedBox(height: 24),
-          // --- 🔥🔥🔥 '가게 전환' 버튼이 여기서 제거되었습니다. ---
           ElevatedButton.icon(
             onPressed: () {
               Navigator.push(context, MaterialPageRoute(builder: (context) => CrewStudioScreen(userProfile: userProfile)));
@@ -240,61 +231,55 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildCertifiedFeed() {
+  Widget _buildAllPostsFeed() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('posts')
           .where('author.uid', isEqualTo: _currentUserId)
-          .where('isCertified', isEqualTo: true)
-          .orderBy('time', descending: true)
+          .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('작성한 인증 피드가 없습니다.'));
+          return const Center(child: Text('작성한 피드가 없습니다.'));
         }
         final docs = snapshot.data!.docs;
         return GridView.builder(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(2.0),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3, crossAxisSpacing: 8, mainAxisSpacing: 8,
+            crossAxisCount: 3,
+            crossAxisSpacing: 2.0,
+            mainAxisSpacing: 2.0,
           ),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
             final itemWithId = {...data, 'id': docs[index].id};
-            return InkWell(
-              onTap: () {},
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: itemWithId['postImageSeed'] != null ? Image.network(
-                  'https://picsum.photos/seed/${itemWithId['postImageSeed']}/300/300',
-                  fit: BoxFit.cover,
-                ) : Container(color: Colors.grey[300], child: const Icon(Icons.image_not_supported)),
-              ),
-            );
+            return PostGridItem(post: itemWithId);
           },
         );
       },
     );
   }
 
-  Widget _buildWrittenPosts(UserProfile userProfile) {
+  Widget _buildCommunityPostsFeed(UserProfile userProfile) {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('posts')
+          .collection('community_posts')
           .where('author.uid', isEqualTo: _currentUserId)
-          .where('isCertified', isEqualTo: false)
-          .orderBy('time', descending: true)
+          .orderBy('createdAt', descending: true)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+        if (snapshot.hasError) {
+          return const Center(child: Text('커뮤니티 글을 불러오는 중 오류가 발생했습니다.'));
+        }
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('작성한 글이 없습니다.'));
+          return const Center(child: Text('작성한 커뮤니티 글이 없습니다.'));
         }
         final docs = snapshot.data!.docs;
         return ListView.builder(
@@ -306,8 +291,8 @@ class _MyPageScreenState extends State<MyPageScreen> with TickerProviderStateMix
             return FeedCard(
               key: ValueKey(itemWithId['id']),
               item: itemWithId,
-              onDelete: () => _deletePost(itemWithId['id']),
-              onUpdate: (caption, tags) => _updatePost(itemWithId['id'], caption, tags),
+              onDelete: () => _deletePost(itemWithId['id'], 'community_posts'),
+              onUpdate: (caption, tags) => _updatePost(itemWithId['id'], caption, tags, 'community_posts'),
               currentUser: userProfile.toMap(),
             );
           },

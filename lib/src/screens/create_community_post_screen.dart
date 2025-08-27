@@ -71,7 +71,7 @@ class _CreateCommunityPostScreenState extends State<CreateCommunityPostScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception("로그인이 필요합니다.");
 
-      final tags = _tagsController.text.split(',').map((tag) => '#${tag.trim()}').where((tag) => tag.length > 1).toList();
+      final tags = _tagsController.text.split(',').map((tag) => tag.trim()).where((tag) => tag.isNotEmpty).toList();
 
       final postData = <String, dynamic>{
         'author': {
@@ -80,12 +80,11 @@ class _CreateCommunityPostScreenState extends State<CreateCommunityPostScreen> {
           'levelTitle': widget.currentUser['levelTitle'],
           'uid': user.uid,
         },
-        'time': Timestamp.now(),
+        'createdAt': Timestamp.now(),
         'caption': caption,
         'tags': tags,
-        'isCertified': false,
-        'isHot': false,
-        'likeCount': 0, // likeCount 필드를 0으로 초기화
+        'likeCount': 0,
+        'commentCount': 0,
       };
 
       if (_isCreatingPoll) {
@@ -105,7 +104,8 @@ class _CreateCommunityPostScreenState extends State<CreateCommunityPostScreen> {
         postData['poll'] = {'options': options};
       }
 
-      await FirebaseFirestore.instance.collection('posts').add(postData);
+      // --- 🔥🔥🔥 수정된 부분: community_posts 컬렉션에 저장합니다. ---
+      await FirebaseFirestore.instance.collection('community_posts').add(postData);
 
       await _firestoreService.incrementUserXp(user.uid, 10);
 
@@ -121,7 +121,6 @@ class _CreateCommunityPostScreenState extends State<CreateCommunityPostScreen> {
       if (mounted) setState(() { _isLoading = false; });
     }
   }
-
 
   @override
   Widget build(BuildContext context) {

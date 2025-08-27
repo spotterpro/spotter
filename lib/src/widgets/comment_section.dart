@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:spotter/services/firestore_service.dart';
-import 'package:spotter/src/screens/user_profile_screen.dart'; // 추가된 부분
+import 'package:spotter/src/screens/user_profile_screen.dart';
 
 class CommentSection extends StatefulWidget {
   final String postId;
@@ -102,7 +102,6 @@ class _CommentSectionState extends State<CommentSection> {
     });
   }
 
-  // --- 형님의 요청대로 추가된 부분 ---
   void _navigateToUserProfile(String userId) {
     Navigator.push(
       context,
@@ -219,7 +218,7 @@ class _CommentSectionState extends State<CommentSection> {
     final authorName = author['name'] ?? '알 수 없음';
     final authorImageSeed = author['imageSeed'] ?? 'default';
     final authorLevel = author['levelTitle'] ?? 'LV.1';
-    final authorUid = author['uid'] as String?; // uid를 String? 타입으로 받습니다.
+    final authorUid = author['uid'] as String?;
 
     bool isMyComment = authorUid != null && authorUid == FirebaseAuth.instance.currentUser?.uid;
 
@@ -230,7 +229,6 @@ class _CommentSectionState extends State<CommentSection> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- 형님의 요청대로 수정된 부분 ---
           GestureDetector(
             onTap: () {
               if (authorUid != null) {
@@ -244,7 +242,6 @@ class _CommentSectionState extends State<CommentSection> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // --- 형님의 요청대로 수정된 부분 ---
                 GestureDetector(
                   onTap: () {
                     if (authorUid != null) {
@@ -252,7 +249,7 @@ class _CommentSectionState extends State<CommentSection> {
                     }
                   },
                   child: Row(
-                    mainAxisSize: MainAxisSize.min, // Row가 최소한의 공간만 차지하도록 설정
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(authorName, style: const TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(width: 8),
@@ -295,7 +292,9 @@ class _CommentSectionState extends State<CommentSection> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            isExpanded ? '답글 숨기기' : '답글 $replyCount개 보기',
+                            // --- START: ★★★ 이 부분이 에러의 원인이었습니다. 수정 완료. ★★★ ---
+                            isExpanded ? '답글 숨기기' : '답글 ${replyCount}개 보기',
+                            // --- END: ★★★ 수정 완료. ★★★ ---
                             style: TextStyle(color: Colors.grey[600], fontSize: 12, fontWeight: FontWeight.w500),
                           ),
                           const SizedBox(width: 2),
@@ -338,7 +337,7 @@ class _CommentSectionState extends State<CommentSection> {
               ListTile(leading: const Icon(Icons.delete_outline, color: Colors.red), title: const Text('삭제하기', style: TextStyle(color: Colors.red)),
                 onTap: () {
                   Navigator.pop(context);
-                  _firestoreService.deleteComment(docRef);
+                  _firestoreService.deleteCommentOrReply(docRef);
                 },
               ),
               const Divider(height: 1, indent: 16, endIndent: 16),

@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:spotter/src/screens/owner/create_owner_post_screen.dart';
-import 'package:spotter/src/screens/store_detail_screen.dart'; // 가게 상세 화면 임포트
+import 'package:spotter/src/screens/store_detail_screen.dart';
 
 class OwnerCommunityScreen extends StatefulWidget {
   final String storeId;
@@ -19,7 +19,7 @@ class _OwnerCommunityScreenState extends State<OwnerCommunityScreen> {
   String? _selectedCategory;
   final String _currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-  final List<Map<String, String>> _categories = [
+  final List<Map<String, String>> _categories = const [
     {'value': 'marketing', 'label': '마케팅 팁'},
     {'value': 'collaboration', 'label': '콜라보 제안'},
     {'value': 'qna', 'label': '질문'},
@@ -89,7 +89,7 @@ class _OwnerCommunityScreenState extends State<OwnerCommunityScreen> {
           const SizedBox(width: 8),
           ChoiceChip(
             label: const Text('전체'),
-            selected: _selectedFilter == 'all',
+            selected: _selectedFilter == 'all' && _selectedCategory == null,
             onSelected: (selected) {
               if (selected) setState(() { _selectedFilter = 'all'; _selectedCategory = null; });
             },
@@ -103,43 +103,43 @@ class _OwnerCommunityScreenState extends State<OwnerCommunityScreen> {
             },
           ),
           const Spacer(),
-          PopupMenuButton<String>(
-            onSelected: (String value) {
-              setState(() {
-                _selectedFilter = 'all';
-                _selectedCategory = value == 'all_categories' ? null : value;
-              });
-            },
-            itemBuilder: (BuildContext context) {
-              return [
-                const PopupMenuItem<String>(
-                  value: 'all_categories',
-                  child: Text('모든 카테고리'),
-                ),
-                ..._categories.map((category) {
-                  return PopupMenuItem<String>(
-                    value: category['value'],
-                    child: Text(category['label']!),
-                  );
-                }).toList(),
-              ];
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    _selectedCategory == null
-                        ? '카테고리'
-                        : _categories.firstWhere((c) => c['value'] == _selectedCategory)['label']!,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+          Material(
+            color: Theme.of(context).chipTheme.backgroundColor,
+            shape: const StadiumBorder(),
+            child: PopupMenuButton<String>(
+              onSelected: (String value) {
+                setState(() {
+                  _selectedFilter = 'all';
+                  _selectedCategory = value == 'all_categories' ? null : value;
+                });
+              },
+              itemBuilder: (BuildContext context) {
+                return [
+                  const PopupMenuItem<String>(
+                    value: 'all_categories',
+                    child: Text('모든 카테고리'),
                   ),
-                  const Icon(Icons.arrow_drop_down, color: Colors.grey),
-                ],
+                  ..._categories.map((category) {
+                    return PopupMenuItem<String>(
+                      value: category['value']!,
+                      child: Text(category['label']!),
+                    );
+                  }),
+                ];
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                child: Row(
+                  children: [
+                    Text(
+                      _selectedCategory == null
+                          ? '카테고리'
+                          : _categories.firstWhere((c) => c['value'] == _selectedCategory)['label']!,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    const Icon(Icons.arrow_drop_down, color: Colors.grey, size: 20),
+                  ],
+                ),
               ),
             ),
           ),
@@ -162,6 +162,7 @@ class _OwnerPostCard extends StatelessWidget {
         : '자유게시판';
     final categoryColor = postData['category'] == 'collaboration' ? Colors.purple : Colors.blue;
     final tags = (postData['tags'] as List<dynamic>?)?.cast<String>() ?? [];
+    final authorImageUrl = postData['authorStoreImageUrl'] as String?;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -175,7 +176,6 @@ class _OwnerPostCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                // --- 🔥🔥🔥 수정된 부분: 프로필 사진에 탭 기능 추가 ---
                 GestureDetector(
                   onTap: () {
                     final authorUid = postData['authorUid'] as String?;
@@ -185,22 +185,27 @@ class _OwnerPostCard extends StatelessWidget {
                   },
                   child: CircleAvatar(
                     radius: 20,
-                    // --- 🔥🔥🔥 수정된 부분: authorUid 대신 authorImageSeed 사용 ---
-                    backgroundImage: NetworkImage('https://picsum.photos/seed/${postData['authorImageSeed']}/100/100'),
+                    backgroundImage: (authorImageUrl != null && authorImageUrl.isNotEmpty)
+                        ? NetworkImage(authorImageUrl)
+                        : null,
+                    child: (authorImageUrl == null || authorImageUrl.isEmpty)
+                        ? const Icon(Icons.store, color: Colors.grey)
+                        : null,
                   ),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(postData['storeName'] ?? '가게 이름', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text(
-                        '${(postData['createdAt'] as Timestamp?)?.toDate().toLocal().toString().substring(0, 16) ?? ''}',
-                        style: const TextStyle(color: Colors.grey, fontSize: 12)
-                    ),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(postData['storeName'] ?? '가게 이름', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                          '${(postData['createdAt'] as Timestamp?)?.toDate().toLocal().toString().substring(0, 16) ?? ''}',
+                          style: const TextStyle(color: Colors.grey, fontSize: 12)
+                      ),
+                    ],
+                  ),
                 ),
-                const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -214,24 +219,19 @@ class _OwnerPostCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              postData['title'] ?? '제목 없음',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
               postData['body'] ?? '',
-              maxLines: 3,
+              maxLines: 5,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: Colors.grey[800], height: 1.5),
+              // --- 🔥🔥🔥 수정된 부분: 고정 색상을 제거하여 테마에 맞는 색상이 적용되도록 합니다. ---
+              style: const TextStyle(height: 1.5, fontSize: 16),
             ),
-            // --- 🔥🔥🔥 수정된 부분: 해시태그 표시 ---
             if (tags.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 12.0),
                 child: Wrap(
-                  spacing: 6.0,
+                  spacing: 8.0,
                   runSpacing: 4.0,
-                  children: tags.map((tag) => Text(tag, style: const TextStyle(color: Colors.blueAccent))).toList(),
+                  children: tags.map((tag) => Text('#$tag', style: const TextStyle(color: Colors.blueAccent))).toList(),
                 ),
               ),
             const SizedBox(height: 16),

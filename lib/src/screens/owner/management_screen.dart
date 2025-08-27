@@ -27,7 +27,6 @@ class _ManagementScreenState extends State<ManagementScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    // --- 🔥🔥🔥 수정된 부분: Scaffold와 AppBar를 제거하고 내용물만 남깁니다. ---
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance.collection('stores').doc(widget.storeId).snapshots(),
       builder: (context, snapshot) {
@@ -45,12 +44,15 @@ class _ManagementScreenState extends State<ManagementScreen> with SingleTickerPr
             children: [
               _buildStoreInfoCard(context, storeData),
               const SizedBox(height: 24),
+              // --- 🔥🔥🔥 이 부분의 색상 및 스타일을 수정했습니다! ---
               TabBar(
                 controller: _tabController,
-                labelColor: Colors.black,
+                labelColor: Colors.orange[800],
                 unselectedLabelColor: Colors.grey[600],
-                indicatorColor: Colors.black,
+                indicatorColor: Colors.orange[800],
                 indicatorWeight: 3,
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 15),
                 tabs: const [
                   Tab(text: '가게 소식 관리'),
                   Tab(text: '고객 인증샷 모아보기'),

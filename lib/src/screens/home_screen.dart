@@ -6,18 +6,15 @@ import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:spotter/src/screens/message_screen.dart';
 import 'package:spotter/src/screens/store_detail_screen.dart';
-import 'package:spotter/src/screens/tour_detail_screen.dart';
 import 'package:spotter/src/widgets/feed_card.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class HomeScreen extends StatefulWidget {
-  final List<Map<String, dynamic>> feedItems;
-  final Function(String) onDelete;
   final Map<String, dynamic> currentUser;
 
   const HomeScreen({
     Key? key,
-    required this.feedItems,
-    required this.onDelete,
     required this.currentUser,
   }) : super(key: key);
 
@@ -28,83 +25,176 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _selectedSort = '거리순';
   final List<String> _sortOptions = ['거리순', '인기순', '신규오픈순', '혜택많은순'];
-  int _selectedTagIndex = 0;
-  final List<String> _tags = ['#전체', '#동성로', '#율하', '#수성못', '#앞산', '#세탁', '#파스타맛집'];
+
+  final TextEditingController _searchController = TextEditingController();
+  String _searchText = '';
+  Timer? _debounce;
 
   KakaoMapController? mapController;
-  Set<Marker> markers = {};
-  StreamSubscription<QuerySnapshot>? _storeSubscription;
+  Marker? _myLocationMarker;
+
+  LatLng _currentCenter = LatLng(35.8714, 128.6014);
+  bool _isMapLoading = true;
+  bool _isMovingToMyLocation = false;
 
   @override
   void initState() {
     super.initState();
-  }
-
-  void _startStoreSubscription() {
-    _storeSubscription?.cancel();
-    _storeSubscription = FirebaseFirestore.instance
-        .collection('stores')
-        .where('status', isEqualTo: 'approved')
-        .where('hasRewards', isEqualTo: true)
-        .snapshots()
-        .listen((snapshot) {
-      final newMarkers = <Marker>{};
-      for (var doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        final GeoPoint location = data['location'];
-
-        newMarkers.add(Marker(
-          markerId: doc.id,
-          latLng: LatLng(location.latitude, location.longitude),
-        ));
-      }
-      if (mounted) {
-        setState(() {
-          markers = newMarkers;
-        });
-      }
-    }, onError: (error) {
-      print("가게 정보 실시간 감시 실패: $error");
-    });
-  }
-
-  Future<void> _onMarkerTapped(String markerId) async {
-    try {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => StoreDetailScreen(storeId: markerId)),
-      );
-    } catch (e) {
-      print('가게 상세 정보 로딩 실패: $e');
-    }
+    _initializeMap();
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
-    _storeSubscription?.cancel();
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if(mounted) {
+        setState(() {
+          _searchText = _searchController.text;
+        });
+      }
+    });
+  }
+
+  Future<void> _initializeMap() async {
+    await _checkAndRequestLocationPermission();
+    await _moveToCurrentUserLocation(isInitial: true);
+  }
+
+  Future<void> _checkAndRequestLocationPermission() async {
+    var status = await Permission.location.status;
+    if (status.isDenied) {
+      status = await Permission.location.request();
+    }
+    if (status.isPermanentlyDenied) {
+      openAppSettings();
+    }
+  }
+
+  Future<void> _moveToCurrentUserLocation({bool isInitial = false}) async {
+    if (_isMovingToMyLocation) return;
+    if (mounted) setState(() => _isMovingToMyLocation = true);
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final newCenter = LatLng(position.latitude, position.longitude);
+
+      final myLocationMarker = Marker(
+        markerId: 'myLocation',
+        latLng: newCenter,
+        markerImageSrc: 'http://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
+      );
+
+      if (mounted) {
+        setState(() {
+          _myLocationMarker = myLocationMarker;
+          if (isInitial) {
+            _currentCenter = newCenter;
+            _isMapLoading = false;
+          }
+        });
+      }
+      mapController?.panTo(newCenter);
+    } catch (e) {
+      debugPrint("현재 위치 탐색 실패: $e");
+      if (isInitial && mounted) {
+        setState(() { _isMapLoading = false; });
+      }
+    } finally {
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) setState(() => _isMovingToMyLocation = false);
+    }
+  }
+
+  Future<void> _deletePost(String postId) async {
+    try {
+      await FirebaseFirestore.instance.collection('posts').doc(postId).delete();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('게시물이 삭제되었습니다.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('삭제 중 오류가 발생했습니다: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _updatePost(String postId, String newCaption, List<String> newTags) async {
+    try {
+      await FirebaseFirestore.instance.collection('posts').doc(postId).update({
+        'caption': newCaption,
+        'tags': newTags,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('게시물이 수정되었습니다.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('수정 중 오류가 발생했습니다: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Query _buildQueryWithSearchAndSort(Query baseQuery) {
+    Query query = baseQuery;
+    if (_searchText.isNotEmpty) {
+      List<String> searchTerms = _searchText.toLowerCase().split(' ').where((s) => s.isNotEmpty).toList();
+      for (var term in searchTerms) {
+        query = query.where('keywords', arrayContains: term);
+      }
+    } else {
+      query = query.orderBy('createdAt', descending: true);
+    }
+    return query;
+  }
+
+  Stream<QuerySnapshot> _getStoreStream() {
+    Query baseQuery = FirebaseFirestore.instance.collection('stores').where('status', isEqualTo: 'approved');
+    return _buildQueryWithSearchAndSort(baseQuery).snapshots();
+  }
+
+  Stream<QuerySnapshot> _getPostStream() {
+    Query baseQuery = FirebaseFirestore.instance.collection('posts');
+    return _buildQueryWithSearchAndSort(baseQuery).snapshots();
+  }
+
+  Future<void> _onStoreOverlayTapped(String storeId) async {
+    try {
+      Navigator.push(context, MaterialPageRoute(builder: (context) => StoreDetailScreen(storeId: storeId)));
+    } catch (e) {
+      debugPrint('가게 상세 정보 로딩 실패: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final displayedItems = _getDisplayedItems();
     return Scaffold(
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            pinned: true,
-            floating: false,
-            elevation: 1,
-            toolbarHeight: 60,
+            pinned: true, floating: false, elevation: 1, toolbarHeight: 60,
             title: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Spotter', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                 Row(
                   children: [
-                    IconButton(icon: const Icon(Icons.message_outlined), onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const MessageScreen()));
-                    }),
+                    IconButton(icon: const Icon(Icons.message_outlined), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const MessageScreen()))),
                     IconButton(icon: const Icon(Icons.notifications_none), onPressed: () {}),
                   ],
                 ),
@@ -112,46 +202,120 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           SliverPersistentHeader(
-            delegate: _FilterHeaderDelegate(
-              selectedSort: _selectedSort, sortOptions: _sortOptions,
+            delegate: _StickyFilterHeaderDelegate(
+              searchController: _searchController,
+              selectedSort: _selectedSort,
+              sortOptions: _sortOptions,
               onSortChanged: (newValue) { setState(() { _selectedSort = newValue!; }); },
-              tags: _tags, selectedTagIndex: _selectedTagIndex,
-              onTagSelected: (index) { setState(() { _selectedTagIndex = index; }); },
             ),
             pinned: true,
           ),
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 250,
-              child: KakaoMap(
-                onMapCreated: ((controller) {
-                  mapController = controller;
-                  _startStoreSubscription();
-                }),
-                markers: markers.toList(),
-                center: LatLng(35.8714, 128.6014),
-                onMarkerTap: (markerId, latLng, zoomLevel) => _onMarkerTapped(markerId),
-              ),
-            ),
-          ),
+          SliverToBoxAdapter(child: SizedBox(height: 250, child: StreamBuilder<QuerySnapshot>(
+            stream: _getStoreStream(),
+            builder: (context, snapshot) {
+              // --- START: ★★★ '커스텀 오버레이'를 builder 안에서 직접 생성 ★★★ ---
+              List<CustomOverlay> storeOverlays = [];
+              if (snapshot.hasData) {
+                for (var doc in snapshot.data!.docs) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final GeoPoint location = data['location'];
+                  // 가게 이름이 길어질 경우를 대비해, 표시될 최대 글자 수를 정하는 것이 좋습니다.
+                  String storeName = data['storeName'] ?? '이름 없음';
+                  if (storeName.length > 8) {
+                    storeName = '${storeName.substring(0, 7)}…';
+                  }
+
+                  // HTML과 CSS로 이름표 스타일을 지정합니다.
+                  final content = '<div style="background-color: white; border: 1.5px solid #FF7A00; border-radius: 8px; padding: 4px 8px; font-size: 13px; font-weight: bold; color: black; white-space: nowrap;">$storeName</div>';
+
+                  storeOverlays.add(CustomOverlay(
+                    customOverlayId: doc.id,
+                    latLng: LatLng(location.latitude, location.longitude),
+                    content: content,
+                  ));
+                }
+              }
+
+              final List<Marker> allMarkers = [];
+              if (_myLocationMarker != null) {
+                allMarkers.add(_myLocationMarker!);
+              }
+              // --- END: ★★★ 생성 로직 완료 ★★★ ---
+
+              return Stack(
+                children: [
+                  KakaoMap(
+                    onMapCreated: ((controller) { mapController = controller; }),
+                    markers: allMarkers,
+                    customOverlays: storeOverlays, // 지도에 이름표 목록 전달
+                    center: _currentCenter,
+                    onCustomOverlayTap: (overlayId, latLng) { // 이름표 탭 이벤트
+                      _onStoreOverlayTapped(overlayId);
+                    },
+                  ),
+                  if (_isMapLoading)
+                    Container(color: Colors.white.withOpacity(0.7), child: const Center(child: CircularProgressIndicator())),
+                  Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: FloatingActionButton(
+                      onPressed: _isMovingToMyLocation ? null : _moveToCurrentUserLocation,
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      mini: true,
+                      child: _isMovingToMyLocation
+                          ? const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, valueColor: AlwaysStoppedAnimation<Color>(Colors.orange)),
+                      )
+                          : const Icon(Icons.my_location),
+                      heroTag: 'myLocationFab',
+                    ),
+                  ),
+                ],
+              );
+            },
+          ))),
           _buildSectionHeader("🔥 지금 뜨는 스팟 추천"),
           SliverToBoxAdapter(child: _buildTrendingSpotsList(context)),
           SliverToBoxAdapter(child: _BannerCarousel()),
           _buildSectionHeader("실시간 스팟 피드"),
-          _buildRealtimeFeedList(displayedItems),
+          _buildRealtimeFeedList(),
         ],
       ),
     );
   }
 
+  Widget _buildRealtimeFeedList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _getPostStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) return const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()));
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.all(32.0), child: Text('피드가 없거나 검색 결과가 없습니다.'))));
+        final feedItems = snapshot.data!.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return {...data, 'id': doc.id};
+        }).toList();
+        return SliverList.builder(
+          itemCount: feedItems.length,
+          itemBuilder: (context, index) {
+            final item = feedItems[index];
+            return FeedCard(
+              key: ValueKey(item['id']),
+              item: item,
+              currentUser: widget.currentUser,
+              onDelete: () => _deletePost(item['id']),
+              onUpdate: (caption, tags) => _updatePost(item['id'], caption, tags),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildTrendingSpotsList(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collectionGroup('rewards')
-          .where('isActive', isEqualTo: true)
-          .orderBy('createdAt', descending: true)
-          .limit(10)
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collectionGroup('rewards').where('isActive', isEqualTo: true).orderBy('createdAt', descending: true).limit(10).snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(height: 230, child: Center(child: CircularProgressIndicator()));
@@ -160,7 +324,6 @@ class _HomeScreenState extends State<HomeScreen> {
           return const SizedBox(height: 230, child: Center(child: Text('현재 추천 스팟이 없습니다.')));
         }
         final trendingSpots = snapshot.data!.docs;
-
         return SizedBox(
           height: 230,
           child: ListView.builder(
@@ -170,17 +333,10 @@ class _HomeScreenState extends State<HomeScreen> {
             itemBuilder: (context, index) {
               final spotDoc = trendingSpots[index];
               final spot = spotDoc.data() as Map<String, dynamic>;
-
-              // --- 🔥🔥🔥 수정된 부분: 표시할 이미지 URL을 결정합니다. ---
-              // 1순위: 리워드 자체 이미지, 2순위: 가게 대표 이미지
-              final String? displayImageUrl = spot['imageUrl'] ?? spot['storeImageUrl'];
-
+              final displayImageUrl = spot['imageUrl'] ?? spot['storeImageUrl'];
               final spotForCard = {
-                'type': '리워드',
-                'title': spot['title'] ?? '리워드',
-                'storeName': spot['storeName'] ?? '가게',
-                'imageUrl': displayImageUrl, // 사용할 이미지 URL 전달
-                'storeId': spot['storeId'],
+                'type': '리워드', 'title': spot['title'] ?? '리워드', 'storeName': spot['storeName'] ?? '가게',
+                'imageUrl': displayImageUrl, 'storeId': spot['storeId'],
               };
               return _buildSpotCard(context, spotForCard);
             },
@@ -193,7 +349,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildSpotCard(BuildContext context, Map<String, dynamic> spot) {
     final storeId = spot['storeId'] as String?;
     final imageUrl = spot['imageUrl'] as String?;
-
     return Container(
       width: 160,
       margin: const EdgeInsets.only(right: 12.0),
@@ -211,26 +366,12 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  // --- 🔥🔥🔥 수정된 부분: imageUrl이 있으면 그것을, 없으면 임시 이미지를 보여줍니다. ---
                   child: imageUrl != null && imageUrl.isNotEmpty
                       ? Image.network(
-                    imageUrl,
-                    height: 140,
-                    width: 160,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                        height: 140,
-                        width: 160,
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.error_outline, color: Colors.grey)
-                    ),
+                    imageUrl, height: 140, width: 160, fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(height: 140, width: 160, color: Colors.grey[200], child: const Icon(Icons.error_outline, color: Colors.grey)),
                   )
-                      : Container(
-                      height: 140,
-                      width: 160,
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.image_not_supported, color: Colors.grey)
-                  ),
+                      : Container(height: 140, width: 160, color: Colors.grey[200], child: const Icon(Icons.image_not_supported, color: Colors.grey)),
                 ),
                 Positioned(
                   top: 8, left: 8,
@@ -248,11 +389,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-              child: Row(
-                children: [
-                  Expanded(child: Text(spot['storeName'] ?? '', style: TextStyle(color: Colors.grey[600], fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                ],
-              ),
+              child: Text(spot['storeName'] ?? '', style: TextStyle(color: Colors.grey[600], fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
@@ -264,8 +401,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance.collection('stores').doc(storeId).collection('regulars').snapshots(),
                         builder: (context, snapshot) {
-                          final count = snapshot.data?.size ?? 0;
-                          return Text('단골 $count', style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500));
+                          return Text('단골 ${snapshot.data?.size ?? 0}', style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500));
                         }
                     )
                   else
@@ -279,50 +415,82 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  List<Map<String, dynamic>> _getDisplayedItems() {
-    if (_selectedTagIndex == 0) {
-      return widget.feedItems;
-    } else {
-      final selectedTag = _tags[_selectedTagIndex];
-      return widget.feedItems.where((item) {
-        final tags = item['tags'] as List<String>? ?? [];
-        return tags.contains(selectedTag);
-      }).toList();
-    }
-  }
-
-  Widget _buildRealtimeFeedList(List<Map<String, dynamic>> items) {
-    return SliverList.builder(
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return FeedCard(
-          key: ValueKey(item['id']),
-          item: item,
-          onDelete: () => widget.onDelete(item['id'] as String),
-          currentUser: widget.currentUser,
-        );
-      },
-    );
-  }
-
   SliverToBoxAdapter _buildSectionHeader(String title) { return SliverToBoxAdapter( child: Padding( padding: const EdgeInsets.fromLTRB(16, 24, 16, 8), child: Row( mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [ Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), if (title.contains("스팟 추천")) const Text('전체보기', style: TextStyle(color: Colors.grey, fontSize: 14)), ], ), ), ); }
 }
 
-class _FilterHeaderDelegate extends SliverPersistentHeaderDelegate {
+class _StickyFilterHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final TextEditingController searchController;
   final String selectedSort;
   final List<String> sortOptions;
   final ValueChanged<String?> onSortChanged;
-  final List<String> tags;
-  final int selectedTagIndex;
-  final ValueChanged<int> onTagSelected;
-  _FilterHeaderDelegate({ required this.selectedSort, required this.sortOptions, required this.onSortChanged, required this.tags, required this.selectedTagIndex, required this.onTagSelected, });
+
+  _StickyFilterHeaderDelegate({
+    required this.searchController,
+    required this.selectedSort,
+    required this.sortOptions,
+    required this.onSortChanged,
+  });
+
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return Container( color: Theme.of(context).cardColor, height: 50.0, child: Row( children: [ Padding( padding: const EdgeInsets.only(left: 8.0), child: IconButton( icon: const Icon(Icons.search), onPressed: () {}, ), ), Expanded( child: ListView( scrollDirection: Axis.horizontal, padding: const EdgeInsets.only(top: 8, bottom: 8, right: 16), children: [ Container( padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration( border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(20), ), child: DropdownButton<String>( value: selectedSort, items: sortOptions.map((String value) { return DropdownMenuItem<String>( value: value, child: Text(value, style: const TextStyle(fontSize: 14)), ); }).toList(), onChanged: onSortChanged, underline: Container(), icon: const Icon(Icons.keyboard_arrow_down, size: 20), ), ), const SizedBox(width: 8), ...List.generate(tags.length, (index) { return Padding( padding: const EdgeInsets.symmetric(horizontal: 4.0), child: ChoiceChip( padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0), label: Text(tags[index]), selected: selectedTagIndex == index, onSelected: (selected) { if (selected) { onTagSelected(index); } }, backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[800] : Colors.grey[200], selectedColor: Colors.black, labelStyle: TextStyle( fontSize: 14, fontWeight: FontWeight.w500, color: selectedTagIndex == index ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color, ), shape: RoundedRectangleBorder( borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.grey.shade300), ), ), ); }), ], ), ), ], ), );
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final searchBarColor = isDarkMode ? Colors.grey[800] : Colors.grey[200];
+    final dropdownColor = Theme.of(context).cardColor;
+    final borderColor = isDarkMode ? Colors.grey[700] : Colors.grey[300];
+    final iconColor = isDarkMode ? Colors.grey[400] : Colors.grey[600];
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 12.0),
+        child: Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(color: searchBarColor, borderRadius: BorderRadius.circular(12.0)),
+                child: TextField(
+                  controller: searchController,
+                  decoration: InputDecoration(
+                      hintText: '지역, 가게, #태그 검색',
+                      prefixIcon: Icon(Icons.search, color: iconColor),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 8.0),
+                      hintStyle: TextStyle(color: iconColor)
+                  ),
+                  style: TextStyle(fontSize: 15, color: textColor),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              decoration: BoxDecoration(
+                color: dropdownColor,
+                borderRadius: BorderRadius.circular(12.0),
+                border: Border.all(color: borderColor!),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: selectedSort,
+                  dropdownColor: dropdownColor,
+                  items: sortOptions.map((String value) {
+                    return DropdownMenuItem<String>(value: value, child: Text(value, style: TextStyle(fontSize: 14, color: textColor)));
+                  }).toList(),
+                  onChanged: onSortChanged,
+                  icon: Icon(Icons.keyboard_arrow_down, size: 20, color: iconColor),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
-  @override double get maxExtent => 50.0;
-  @override double get minExtent => 50.0;
+
+  @override double get maxExtent => 64.0;
+  @override double get minExtent => 64.0;
   @override bool shouldRebuild(SliverPersistentHeaderDelegate oldDelegate) { return true; }
 }
 
@@ -381,7 +549,8 @@ class __BannerCarouselState extends State<_BannerCarousel> {
                 margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.black.withOpacity(_current == entry.key ? 0.9 : 0.4),
+                  color: (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black)
+                      .withOpacity(_current == entry.key ? 0.9 : 0.4),
                 ),
               );
             }).toList(),

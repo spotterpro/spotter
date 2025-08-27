@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:spotter/src/services/firestore_service.dart'; // ★★★ 저희의 만능 청소부(서비스)를 불러옵니다 ★★★
 
 class AdminApplicationDetailScreen extends StatefulWidget {
   final String applicationId;
@@ -25,6 +26,8 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
   late final TextEditingController _latController;
   late final TextEditingController _lngController;
   late final TextEditingController _addressController;
+
+  final FirestoreService _firestoreService = FirestoreService(); // ★★★ 만능 청소부(서비스)를 준비시킵니다 ★★★
 
   @override
   void initState() {
@@ -47,6 +50,7 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
       FirebaseFirestore.instance.collection('stores').doc(widget.applicationId);
 
   Future<void> _searchCoordinates() async {
+    // ... 기존 코드와 동일 (수정 없음) ...
     final address = _addressController.text.trim();
     if (address.isEmpty) {
       if (!mounted) return;
@@ -55,19 +59,14 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
       );
       return;
     }
-
     const kakaoRestApiKey = '2e8c74663cec574402127273f3597e1a';
-
     final url = Uri.parse('https://dapi.kakao.com/v2/local/search/address.json?query=${Uri.encodeComponent(address)}');
-
     try {
       final response = await http.get(
         url,
         headers: {'Authorization': 'KakaoAK $kakaoRestApiKey'},
       );
-
       if (!mounted) return;
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['documents'] != null && data['documents'].isNotEmpty) {
@@ -98,13 +97,12 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
   }
 
   Future<void> _approveApplication() async {
+    // ... 기존 코드와 동일 (수정 없음) ...
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
-
     try {
       final double? lat = double.tryParse(_latController.text.trim());
       final double? lng = double.tryParse(_lngController.text.trim());
-
       if (lat == null || lng == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -114,9 +112,7 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
         setState(() => _isProcessing = false);
         return;
       }
-
       final newLocation = GeoPoint(lat, lng);
-
       await _storeDoc.update({
         'status': 'awaiting_nfc',
         'location': newLocation,
@@ -125,7 +121,6 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
         if (FirebaseAuth.instance.currentUser != null)
           'reviewedBy': FirebaseAuth.instance.currentUser!.uid,
       });
-
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('1차 승인 완료. 사용자의 NFC 등록을 대기합니다.'), backgroundColor: Colors.blue),
@@ -141,10 +136,9 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
   }
 
   Future<void> _rejectApplication() async {
+    // ... 기존 코드와 동일 (수정 없음) ...
     if (_isProcessing) return;
-
     final reason = await _showRejectReasonDialog(context);
-
     if (reason != null && reason.isNotEmpty) {
       setState(() => _isProcessing = true);
       try {
@@ -171,6 +165,7 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
   }
 
   Future<String?> _showRejectReasonDialog(BuildContext context) {
+    // ... 기존 코드와 동일 (수정 없음) ...
     final reasonController = TextEditingController();
     return showDialog<String>(
       context: context,
@@ -200,34 +195,16 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
     );
   }
 
+  // --- START: ★★★ 이 부분이 핵심 수정 사항입니다 ★★★ ---
+  /// 가게 정보를 영구 삭제합니다.
+  /// 화면에 직접 구현된 로직 대신, 저희가 만든 FirestoreService를 호출합니다.
   Future<void> _deleteApplication() async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
     try {
-      final batch = FirebaseFirestore.instance.batch();
-
-      final rewardsSnap = await _storeDoc.collection('rewards').get();
-      final regularsSnap = await _storeDoc.collection('regulars').get();
-      final visitsSnap = await _storeDoc.collection('visits').get();
-      final nfcTagsSnap = await _storeDoc.collection('nfc_tags').get();
-
-      for (final doc in rewardsSnap.docs) {
-        batch.delete(doc.reference);
-      }
-      for (final doc in regularsSnap.docs) {
-        batch.delete(doc.reference);
-      }
-      for (final doc in visitsSnap.docs) {
-        batch.delete(doc.reference);
-      }
-      for (final doc in nfcTagsSnap.docs) {
-        batch.delete(doc.reference);
-      }
-
-      batch.delete(_storeDoc);
-
-      await batch.commit();
+      // 본사의 전문팀, '만능 청소부'를 호출합니다!
+      await _firestoreService.deleteStoreAndSubcollections(widget.applicationId);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -241,9 +218,11 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
       if (mounted) setState(() => _isProcessing = false);
     }
   }
+  // --- END: ★★★ 핵심 수정 사항입니다 ★★★ ---
 
   @override
   Widget build(BuildContext context) {
+    // ... build 메소드 전체는 기존 코드와 동일 (수정 없음) ...
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: _storeDoc.snapshots(),
       builder: (context, snap) {
@@ -409,6 +388,7 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
   }
 
   Widget _buildNfcManagementSection() {
+    // ... 기존 코드와 동일 (수정 없음) ...
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -450,6 +430,7 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
   }
 
   void _showPermanentDeleteDialog(BuildContext context) {
+    // ... 기존 코드와 동일 (수정 없음) ...
     showDialog(
       context: context,
       builder: (BuildContext ctx) {
@@ -475,6 +456,7 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
   }
 
   void _showDeleteConfirmDialog(BuildContext context, String tagId) {
+    // ... 기존 코드와 동일 (수정 없음) ...
     showDialog(
       context: context,
       builder: (BuildContext ctx) {
@@ -497,6 +479,7 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
   }
 
   Widget _buildInfoTile(String title, dynamic value) {
+    // ... 기존 코드와 동일 (수정 없음) ...
     final v = (value == null || (value is String && value.trim().isEmpty)) ? '—' : value.toString();
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -516,6 +499,7 @@ class _AdminApplicationDetailScreenState extends State<AdminApplicationDetailScr
     required String labelText,
     TextInputType? keyboardType,
   }) {
+    // ... 기존 코드와 동일 (수정 없음) ...
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
       child: TextFormField(

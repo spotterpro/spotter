@@ -12,14 +12,14 @@ class FeedCard extends StatefulWidget {
   final Map<String, dynamic> item;
   final VoidCallback onDelete;
   final Function(String caption, List<String> tags)? onUpdate;
-  final Map<String, dynamic> currentUser; // 추가된 부분
+  final Map<String, dynamic> currentUser;
 
   const FeedCard({
     super.key,
     required this.item,
     required this.onDelete,
     this.onUpdate,
-    required this.currentUser, // 추가된 부분
+    required this.currentUser,
   });
 
   @override
@@ -60,7 +60,7 @@ class _FeedCardState extends State<FeedCard> {
       builder: (context) {
         return CommentBottomSheet(
           postId: widget.item['id'],
-          currentUser: widget.currentUser, // 수정된 부분
+          currentUser: widget.currentUser,
         );
       },
     );
@@ -68,7 +68,7 @@ class _FeedCardState extends State<FeedCard> {
 
   void _showPostMenuSheet(Map<String, dynamic> author) {
     final currentUid = FirebaseAuth.instance.currentUser?.uid;
-    bool isMyPost = (author['uid'] != null && author['uid'] == currentUid) || author['name'] == '형님';
+    bool isMyPost = (author['uid'] != null && author['uid'] == currentUid);
 
     showModalBottomSheet(
       context: context,
@@ -128,7 +128,7 @@ class _FeedCardState extends State<FeedCard> {
   void _showEditPostDialog() {
     _captionEditController.text = (widget.item['caption'] ?? '').toString();
     final currentTags = List<String>.from(widget.item['tags'] ?? []);
-    _tagsEditController.text = currentTags.map((t) => t.startsWith('#') ? t.substring(1) : t).join(', ');
+    _tagsEditController.text = currentTags.join(', ');
 
     showDialog(
       context: context,
@@ -163,8 +163,8 @@ class _FeedCardState extends State<FeedCard> {
                 final newCaption = _captionEditController.text.trim();
                 final newTags = _tagsEditController.text
                     .split(',')
-                    .map((e) => '#${e.trim()}')
-                    .where((e) => e.length > 1)
+                    .map((e) => e.trim())
+                    .where((e) => e.isNotEmpty)
                     .toList();
                 widget.onUpdate?.call(newCaption, newTags);
                 Navigator.of(dialogContext).pop();
@@ -210,17 +210,16 @@ class _FeedCardState extends State<FeedCard> {
 
   @override
   Widget build(BuildContext context) {
-    final author = widget.item['author'] is Map<String, dynamic>
-        ? widget.item['author'] as Map<String, dynamic>
-        : {'name': widget.item['userName'] ?? '알 수 없음', 'imageSeed': widget.item['userImageSeed'], 'levelTitle': widget.item['levelTitle']};
-
+    final author = widget.item['author'] as Map<String, dynamic>? ?? {};
     final authorName = author['name'] ?? '알 수 없음';
     final authorImageSeed = author['imageSeed'] ?? 'default';
     final authorLevel = author['levelTitle'] ?? 'LV.1';
     final authorUid = author['uid'] as String?;
-
+    final imageUrl = widget.item['imageUrl'] as String?;
     final tags = List<String>.from(widget.item['tags'] ?? []);
     final pollData = widget.item['poll'] as Map<String, dynamic>?;
+    final isCertified = widget.item['isCertified'] as bool? ?? false;
+    final storeName = widget.item['storeName'] as String?;
 
     return Card(
       margin: const EdgeInsets.fromLTRB(0, 0, 0, 8),
@@ -274,9 +273,25 @@ class _FeedCardState extends State<FeedCard> {
                           ],
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                            _formatTimestamp(widget.item['time'] as Timestamp?),
-                            style: const TextStyle(color: Colors.grey, fontSize: 12)
+                        Row(
+                          children: [
+                            Text(
+                                _formatTimestamp(widget.item['createdAt'] as Timestamp?),
+                                style: const TextStyle(color: Colors.grey, fontSize: 12)
+                            ),
+                            if (isCertified && storeName != null) ...[
+                              const Text(' · ', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                              Icon(Icons.check_circle, color: Colors.green[600], size: 14),
+                              const SizedBox(width: 2),
+                              Flexible(
+                                child: Text(
+                                  '$storeName 인증',
+                                  style: TextStyle(color: Colors.green[700], fontSize: 12, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ]
+                          ],
                         ),
                       ],
                     ),
@@ -288,9 +303,9 @@ class _FeedCardState extends State<FeedCard> {
               ],
             ),
           ),
-          if (widget.item['postImageSeed'] != null)
+          if (imageUrl != null)
             Image.network(
-                'https://picsum.photos/seed/${widget.item['postImageSeed']}/600/400',
+                imageUrl,
                 height: 300,
                 width: double.infinity,
                 fit: BoxFit.cover),
@@ -306,7 +321,7 @@ class _FeedCardState extends State<FeedCard> {
                 Wrap(
                   spacing: 8.0,
                   children: tags
-                      .map((tag) => Text(tag, style: TextStyle(color: Colors.blue[600])))
+                      .map((tag) => Text('#$tag', style: TextStyle(color: Colors.blue[600])))
                       .toList(),
                 ),
                 const SizedBox(height: 12),
