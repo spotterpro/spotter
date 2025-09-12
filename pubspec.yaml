@@ -1,0 +1,58 @@
+name: spotter
+description: "A new Flutter project."
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.3 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase - 추후 연동 시 필요
+  firebase_core: ^3.1.1
+  firebase_auth: ^5.1.1
+
+  # Google & Kakao Login - 추후 연동 시 필요
+  google_sign_in: ^6.2.1
+  kakao_flutter_sdk_user: ^1.9.1+1
+
+  # 아이콘 사용을 위한 패키지
+  font_awesome_flutter: ^10.7.0
+  flutter_svg: ^2.0.10+1
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0
+  change_app_package_name: ^1.2.0
+
+flutter:
+
+  uses-material-design: true
+
+  assets:
+    - assets/images/google_signin_button.png
+    - assets/images/kakao_signin_button.png
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/app_icon_foreground.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/icon/app_icon.png
+
+  android_12:
+    color: "#FFFFFF"
+    image: assets/icon/app_icon.png
