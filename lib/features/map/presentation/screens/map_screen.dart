@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 
-class MapScreen extends StatelessWidget {
+class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
+
+  @override
+  State<MapScreen> createState() => _MapScreenState();
+}
+
+class _MapScreenState extends State<MapScreen> {
+  late KakaoMapController mapController;
 
   @override
   Widget build(BuildContext context) {
@@ -78,23 +86,22 @@ class MapScreen extends StatelessWidget {
               ),
             ),
           ),
-          // 지도 영역 (Placeholder)
+
+          // 지도 영역
           SliverToBoxAdapter(
-            child: Container(
+            child: SizedBox(
               height: 250,
-              margin: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(15.0),
-              ),
-              child: const Center(
-                child: Text(
-                  'Kakao Map SDK 연동 예정',
-                  style: TextStyle(color: Colors.white, fontSize: 18),
-                ),
+              child: KakaoMap(
+                onMapCreated: (controller) {
+                  mapController = controller;
+                  mapController.setCenter(LatLng(35.8714354, 128.601445));
+                  // [수정] 존재하지 않는 setZoomLevel 함수 호출 코드를 삭제했습니다.
+                },
               ),
             ),
           ),
+
+          // ... 이하 프로모션 배너, 피드 등 코드는 이전과 동일합니다 ...
           // 프로모션 배너
           SliverToBoxAdapter(
             child: Container(
@@ -200,7 +207,7 @@ class MapScreen extends StatelessWidget {
               ),
             ),
           ),
-          // [추가된 부분] 실시간 스팟 피드
+          // 실시간 스팟 피드
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -213,9 +220,9 @@ class MapScreen extends StatelessWidget {
           SliverList(
             delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                return _buildFeedItem(); // 피드 아이템 위젯 호출
+                return _buildFeedItem();
               },
-              childCount: 5, // 예시로 5개만 표시
+              childCount: 5,
             ),
           ),
         ],
@@ -223,7 +230,6 @@ class MapScreen extends StatelessWidget {
     );
   }
 
-  // 피드 아이템을 그리는 위젯 메소드
   Widget _buildFeedItem() {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -232,7 +238,6 @@ class MapScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 프로필 섹션
           const Padding(
             padding: EdgeInsets.all(12.0),
             child: Row(
@@ -240,7 +245,6 @@ class MapScreen extends StatelessWidget {
                 CircleAvatar(
                   radius: 20,
                   backgroundColor: Colors.grey,
-                  // backgroundImage: NetworkImage('...'), // TODO: 프로필 이미지 연동
                 ),
                 SizedBox(width: 12.0),
                 Column(
@@ -253,18 +257,14 @@ class MapScreen extends StatelessWidget {
               ],
             ),
           ),
-          // 이미지
           Container(
             height: 300,
             color: Colors.grey.shade300,
-            // child: Image.network('...', fit: BoxFit.cover), // TODO: 피드 이미지 연동
           ),
-          // 본문
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             child: Text('새로 산 옷 자랑! 이 편집샵 완전 내 스타일이야👍'),
           ),
-          // 해시태그
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Wrap(
@@ -278,7 +278,6 @@ class MapScreen extends StatelessWidget {
                   .toList(),
             ),
           ),
-          // 좋아요, 댓글
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Row(

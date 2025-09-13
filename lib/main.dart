@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart'; // Firebase Core 추가
+import 'package:firebase_core/firebase_core.dart';
+import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 import 'package:spotter/features/authentication/presentation/screens/login_screen.dart';
-import 'firebase_options.dart'; // firebase_cli를 통해 생성된 파일
+import 'firebase_options.dart';
 
-void main() async { // async 키워드 추가
-  // main 함수에서 비동기 작업을 처리하기 위한 필수 코드
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Firebase 앱 초기화
+
+  // [수정] 'YOUR_KAKAO_JAVASCRIPT_KEY' 부분을 방금 복사한 실제 키로 교체해주십시오.
+  AuthRepository.initialize(appKey: '3f7eeaf7f86b376c410316e1280d0bac');
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
