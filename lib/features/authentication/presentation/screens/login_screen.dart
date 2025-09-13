@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:spotter/features/authentication/data/services/auth_service.dart';
-import 'package:spotter/features/home/presentation/screens/home_screen.dart';
+import 'package:spotter/features/main_navigation/presentation/screens/main_screen.dart'; // 수정된 부분
 
 // 카카오 로고 SVG 데이터를 코드로 저장
 const String _kakaoLogoSvg = '''
@@ -156,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   if (userCredential != null && mounted) {
                     Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (context) => const HomeScreen()),
+                      MaterialPageRoute(builder: (context) => const MainScreen()), // 수정된 부분
                     );
                   } else if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -201,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         SizedBox(width: 24, height: 24, child: Checkbox(value: value, onChanged: onChanged, activeColor: const Color(0xFFFFA726))),
         const SizedBox(width: 8),
-        Text(text, style: TextStyle(fontWeight: isBold ? FontWeight.normal : FontWeight.normal)),
+        Text(text, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
         const Spacer(),
         if (text != '전체 동의하기')
           TextButton(
