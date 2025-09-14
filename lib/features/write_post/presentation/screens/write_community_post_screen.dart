@@ -20,20 +20,21 @@ class _WriteCommunityPostScreenState extends State<WriteCommunityPostScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // [다크모드 최적화] 현재 테마 확인
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300;
+
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black),
+          icon: const Icon(Icons.close),
           onPressed: () {
             Navigator.of(context).pop();
           },
         ),
         title: const Text(
           '커뮤니티 글쓰기',
-          style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
@@ -59,11 +60,11 @@ class _WriteCommunityPostScreenState extends State<WriteCommunityPostScreen> {
                 hintText: '어떤 이야기를 공유하고 싶으신가요?',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                  borderSide: BorderSide(color: borderColor),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.0),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                  borderSide: BorderSide(color: borderColor),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.0),
@@ -83,11 +84,11 @@ class _WriteCommunityPostScreenState extends State<WriteCommunityPostScreen> {
                     hintText: '쉼표(,)로 태그를 구분해주세요.',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
+                      borderSide: BorderSide(color: borderColor),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
+                      borderSide: BorderSide(color: borderColor),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12.0),
@@ -102,12 +103,12 @@ class _WriteCommunityPostScreenState extends State<WriteCommunityPostScreen> {
               onPressed: () {
                 // TODO: 투표 항목 추가 UI 로직 구현
               },
-              icon: const Icon(Icons.timer_outlined, color: Colors.black54),
-              label: const Text('투표 추가', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+              icon: const Icon(Icons.timer_outlined),
+              label: const Text('투표 추가', style: TextStyle(fontWeight: FontWeight.bold)),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                side: BorderSide(color: Colors.grey.shade300),
+                side: BorderSide(color: borderColor),
               ),
             ),
           ],

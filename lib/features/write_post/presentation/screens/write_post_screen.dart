@@ -27,6 +27,7 @@ class _WritePostScreenState extends State<WritePostScreen> {
   Future<void> _pickImages() async {
     final remainingSlots = _maxPhotos - _photos.length;
     if (remainingSlots <= 0) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('사진은 최대 5장까지 첨부할 수 있습니다.')),
       );
@@ -40,9 +41,11 @@ class _WritePostScreenState extends State<WritePostScreen> {
         setState(() {
           if (pickedFiles.length > remainingSlots) {
             _photos.addAll(pickedFiles.sublist(0, remainingSlots));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('최대 5장까지 선택되어 일부 사진만 추가되었습니다.')),
-            );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('최대 5장까지 선택되어 일부 사진만 추가되었습니다.')),
+              );
+            }
           } else {
             _photos.addAll(pickedFiles);
           }
@@ -63,14 +66,11 @@ class _WritePostScreenState extends State<WritePostScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
         automaticallyImplyLeading: false,
         title: const Text(
           '새 게시물 작성',
-          style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         actions: [
@@ -103,11 +103,14 @@ class _WritePostScreenState extends State<WritePostScreen> {
   }
 
   Widget _buildStampVerificationSection() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200;
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.0),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: borderColor),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -140,8 +143,8 @@ class _WritePostScreenState extends State<WritePostScreen> {
                       width: 150,
                       margin: const EdgeInsets.only(right: 10),
                       decoration: BoxDecoration(
-                        color: isSelected ? Colors.orange.shade50 : Colors.white,
-                        border: Border.all(color: isSelected ? Colors.orange : Colors.grey.shade300),
+                        color: isSelected ? Colors.orange.withOpacity(0.1) : null,
+                        border: Border.all(color: isSelected ? Colors.orange : borderColor),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -149,13 +152,15 @@ class _WritePostScreenState extends State<WritePostScreen> {
                           const SizedBox(width: 8),
                           ClipRRect(borderRadius: BorderRadius.circular(8), child: Container(width: 40, height: 40, color: Colors.grey.shade300)),
                           const SizedBox(width: 8),
-                          Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(store['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                              Text(store['category']!, style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                            ],
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(store['name']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                Text(store['category']!, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -171,11 +176,14 @@ class _WritePostScreenState extends State<WritePostScreen> {
   }
 
   Widget _buildPhotoAttachmentSection() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200;
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.0),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: borderColor),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -199,9 +207,8 @@ class _WritePostScreenState extends State<WritePostScreen> {
                     onTap: _pickImages,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
+                        border: Border.all(color: borderColor),
                       ),
                       child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -230,11 +237,14 @@ class _WritePostScreenState extends State<WritePostScreen> {
   }
 
   Widget _buildContentSection() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200;
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.0),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: borderColor),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -257,11 +267,14 @@ class _WritePostScreenState extends State<WritePostScreen> {
   }
 
   Widget _buildTagSection() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200;
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.0),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: borderColor),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),

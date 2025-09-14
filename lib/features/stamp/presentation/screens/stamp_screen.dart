@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:spotter/features/stamp/presentation/screens/reward_detail_screen.dart';
 import 'package:spotter/features/stamp/presentation/screens/tour_detail_screen.dart';
+import 'package:spotter/features/store/presentation/screens/store_profile_screen.dart';
 
 class StampScreen extends StatefulWidget {
   const StampScreen({super.key});
@@ -11,6 +12,7 @@ class StampScreen extends StatefulWidget {
 
 class _StampScreenState extends State<StampScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  int _couponTabIndex = 0;
 
   @override
   void initState() {
@@ -26,15 +28,15 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: const Text('스탬프', style: TextStyle(color: Colors.black)),
-        backgroundColor: Colors.grey[100],
+        title: const Text('스탬프'),
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.black54),
+            icon: const Icon(Icons.search),
             onPressed: () {},
           )
         ],
@@ -50,10 +52,9 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
                     Tab(text: '모으는 리워드 (2)'),
                     Tab(text: '진행중인 투어 (4)'),
                   ],
-                  labelColor: Colors.black,
+                  indicatorColor: isDarkMode ? Colors.white : Colors.black,
+                  labelColor: isDarkMode ? Colors.white : Colors.black,
                   unselectedLabelColor: Colors.grey,
-                  indicatorColor: Colors.black,
-                  indicatorWeight: 3,
                 ),
               ),
               pinned: true,
@@ -71,17 +72,12 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
     );
   }
 
-  // '모으는 리워드' 탭 위젯
   Widget _buildCollectingRewardsTab() {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
-        GestureDetector(
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const RewardDetailScreen())),
-            child: _buildRewardProgressCard("알리오 올리오 1+1", "맛집 파스타", 2, 3)),
-        GestureDetector(
-            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (context) => const RewardDetailScreen())),
-            child: _buildRewardProgressCard("모든 음료 20% 할인", "카페 스프링", 4, 5)),
+        _buildRewardProgressCard("알리오 올리오 1+1", "맛집 파스타", 2, 3),
+        _buildRewardProgressCard("모든 음료 20% 할인", "카페 스프링", 4, 5),
         const SizedBox(height: 24),
         _buildCouponSection(),
         const SizedBox(height: 24),
@@ -90,7 +86,6 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
     );
   }
 
-  // '진행중인 투어' 탭 위젯
   Widget _buildOngoingToursTab() {
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -108,52 +103,63 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
     );
   }
 
-  // 리워드 진행 카드
   Widget _buildRewardProgressCard(String title, String store, int current, int total) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Container(width: 60, height: 60, color: Colors.grey.shade300),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 4),
-                  Text(store, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: LinearProgressIndicator(
-                          value: current / total,
-                          backgroundColor: Colors.grey[200],
-                          color: Colors.blue,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text("스탬프 현황  $current / $total", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(MaterialPageRoute(builder: (context) => const RewardDetailScreen()));
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => const StoreProfileScreen()));
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(width: 60, height: 60, color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade300),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    Text(store, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: LinearProgressIndicator(
+                            value: current / total,
+                            backgroundColor: isDarkMode ? Colors.grey.shade700 : Colors.grey[200],
+                            color: Colors.blue,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text("스탬프 현황  $current / $total", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // 투어 진행 카드
   Widget _buildTourProgressCard(String title, String desc, String reward, int current, int total) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -182,7 +188,7 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
                   padding: const EdgeInsets.only(right: 8.0),
                   child: CircleAvatar(
                     radius: 20,
-                    backgroundColor: index < current ? Colors.blue.shade100 : Colors.grey.shade200,
+                    backgroundColor: index < current ? Colors.blue.shade100 : (isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200),
                     child: index < current ? const Icon(Icons.check, color: Colors.blue) : null,
                   ),
                 );
@@ -191,7 +197,7 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: LinearProgressIndicator(value: current / total, backgroundColor: Colors.grey[200], color: Colors.orange)),
+                Expanded(child: LinearProgressIndicator(value: current / total, backgroundColor: isDarkMode ? Colors.grey.shade700 : Colors.grey[200], color: Colors.orange)),
                 const SizedBox(width: 8),
                 Text("진행도  $current / $total", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
               ],
@@ -202,8 +208,9 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
     );
   }
 
-  // 쿠폰 섹션
+  // [수정] 쿠폰 목록을 _couponTabIndex 상태에 따라 다르게 보여주도록 수정
   Widget _buildCouponSection() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -217,13 +224,35 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
               children: [
                 Row(
                   children: [
-                    Expanded(child: FilledButton(onPressed: () {}, child: const Text("사용 가능 (1)"), style: FilledButton.styleFrom(backgroundColor: Colors.grey.shade200, foregroundColor: Colors.black))),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => setState(() => _couponTabIndex = 0),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _couponTabIndex == 0 ? (isDarkMode ? Colors.white : Colors.black87) : (isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200),
+                          foregroundColor: _couponTabIndex == 0 ? (isDarkMode ? Colors.black : Colors.white) : (isDarkMode ? Colors.white70 : Colors.black87),
+                        ),
+                        child: const Text("사용 가능 (1)"),
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(child: FilledButton(onPressed: () {}, child: const Text("사용 완료 (1)"), style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, side: BorderSide(color: Colors.grey.shade300)))),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => setState(() => _couponTabIndex = 1),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _couponTabIndex == 1 ? (isDarkMode ? Colors.white : Colors.black87) : (isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200),
+                          foregroundColor: _couponTabIndex == 1 ? (isDarkMode ? Colors.black : Colors.white) : (isDarkMode ? Colors.white70 : Colors.black87),
+                        ),
+                        child: const Text("사용 완료 (1)"),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                _buildCouponCard("첫 방문 10% 할인", "맛집 파스타", "~2024-06-30"),
+                // _couponTabIndex 값에 따라 다른 쿠폰 카드를 보여줍니다.
+                if (_couponTabIndex == 0)
+                  _buildCouponCard("첫 방문 10% 할인", "맛집 파스타", "~2024-06-30", isUsed: false)
+                else
+                  _buildCouponCard("PT 1회 체험권", "헬스 클럽", "사용일: 2024-05-15", isUsed: true),
               ],
             ),
           ),
@@ -232,38 +261,51 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
     );
   }
 
-  // 쿠폰 카드
-  Widget _buildCouponCard(String title, String store, String expiry) {
-    return Row(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Container(width: 60, height: 60, color: Colors.grey.shade300),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 4),
-              Text(store, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              Text("유효기간: $expiry", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-            ],
+  // [수정] 쿠폰 카드가 isUsed 상태를 받아서 UI를 다르게 그리도록 수정
+  Widget _buildCouponCard(String title, String store, String dateInfo, {required bool isUsed}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    return Opacity(
+      opacity: isUsed ? 0.5 : 1.0, // 사용된 쿠폰은 반투명 처리
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Container(width: 60, height: 60, color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade300),
           ),
-        ),
-        Column(
-          children: [
-            FilledButton(onPressed: () {}, child: const Text("사용하기"), style: FilledButton.styleFrom(backgroundColor: Colors.orange)),
-            const SizedBox(height: 4),
-            FilledButton(onPressed: () {}, child: const Text("선물하기")),
-          ],
-        )
-      ],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text(store, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(dateInfo, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
+          ),
+          if (isUsed)
+            FilledButton(
+              onPressed: null, // 비활성화
+              style: FilledButton.styleFrom(
+                backgroundColor: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                foregroundColor: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade500,
+              ),
+              child: const Text("사용 완료"),
+            )
+          else
+            Column(
+              children: [
+                FilledButton(onPressed: () {}, child: const Text("사용하기"), style: FilledButton.styleFrom(backgroundColor: Colors.orange)),
+                const SizedBox(height: 4),
+                FilledButton(onPressed: () {}, child: const Text("선물하기"), style: FilledButton.styleFrom(backgroundColor: isDarkMode ? const Color(0xFF5865F2) : Colors.indigo.shade400)),
+              ],
+            )
+        ],
+      ),
     );
   }
 
-  // 스탬프 컬렉션 섹션
   Widget _buildStampCollectionSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -293,13 +335,13 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
     );
   }
 
-  // 스탬프 컬렉션 아이템
   Widget _buildStampCollectionItem(String name) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.only(right: 16.0),
       child: Column(
         children: [
-          CircleAvatar(radius: 30, backgroundColor: Colors.grey.shade300),
+          CircleAvatar(radius: 30, backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade300),
           const SizedBox(height: 8),
           Text(name, style: const TextStyle(fontSize: 12)),
         ],
@@ -308,7 +350,6 @@ class _StampScreenState extends State<StampScreen> with SingleTickerProviderStat
   }
 }
 
-// 스크롤 시 TabBar가 상단에 고정되도록 하는 Helper 클래스
 class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
   final TabBar tabBar;
 
@@ -322,7 +363,7 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: Colors.grey[100],
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: tabBar,
     );
   }

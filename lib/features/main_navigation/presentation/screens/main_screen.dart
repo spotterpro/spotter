@@ -62,13 +62,9 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: const Color(0xFFFFA726),
         onTap: _onItemTapped,
-        showUnselectedLabels: true,
-        unselectedItemColor: Colors.grey[600],
-        backgroundColor: Colors.white,
         type: BottomNavigationBarType.fixed,
-        elevation: 5,
+        // 테마에서 색상 등을 관리하므로 개별 속성 지정 최소화
       ),
     );
   }

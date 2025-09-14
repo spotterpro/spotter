@@ -13,7 +13,6 @@ class MyPageScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: DefaultTabController(
         length: 2,
         child: SafeArea(
@@ -25,7 +24,6 @@ class MyPageScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    // 크루 스튜디오 화면으로 이동
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (context) => const CrewStudioScreen()),
                     );
@@ -45,15 +43,12 @@ class MyPageScreen extends StatelessWidget {
                   Tab(text: '피드 (1)'),
                   Tab(text: '작성한 글 (0)'),
                 ],
-                labelColor: Colors.black,
-                unselectedLabelColor: Colors.grey,
-                indicatorColor: Colors.black,
               ),
               Expanded(
                 child: TabBarView(
                   children: [
-                    _buildPostGrid(), // '피드' 탭 뷰
-                    _buildPostGrid(isEmpty: true), // '작성한 글' 탭 뷰 (예시로 비워둠)
+                    _buildPostGrid(),
+                    _buildPostGrid(isEmpty: true),
                   ],
                 ),
               ),
@@ -64,7 +59,6 @@ class MyPageScreen extends StatelessWidget {
     );
   }
 
-  // 프로필 상단 헤더
   Widget _buildProfileHeader(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -73,13 +67,12 @@ class MyPageScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const SizedBox(width: 40), // 왼쪽 공간 확보용
+              const SizedBox(width: 40),
               const CircleAvatar(radius: 40, backgroundColor: Colors.grey),
               SizedBox(
                 width: 40,
                 child: IconButton(
                   onPressed: () {
-                    // 설정 화면으로 이동
                     Navigator.of(context).push(
                       MaterialPageRoute(builder: (context) => const SettingsScreen()),
                     );
@@ -100,11 +93,9 @@ class MyPageScreen extends StatelessWidget {
     );
   }
 
-  // 경험치 바
   Widget _buildXpBar(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // 나의 성장 기록 화면으로 이동
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => const GrowthRecordScreen(),
@@ -124,7 +115,7 @@ class MyPageScreen extends StatelessWidget {
           const SizedBox(height: 4),
           LinearProgressIndicator(
             value: 1530 / (1530 + 470),
-            backgroundColor: Colors.grey[200],
+            backgroundColor: Colors.grey[300],
             color: Colors.orange,
             minHeight: 6,
             borderRadius: BorderRadius.circular(3),
@@ -134,7 +125,6 @@ class MyPageScreen extends StatelessWidget {
     );
   }
 
-  // 프로필 스탯
   Widget _buildProfileStats(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -142,24 +132,15 @@ class MyPageScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           GestureDetector(
-            onTap: () {
-              // 팔로워/팔로잉 목록 화면으로 이동
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowListScreen()));
-            },
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowListScreen(initialIndex: 0))),
             child: _buildStatItem("125", "팔로워"),
           ),
           GestureDetector(
-            onTap: () {
-              // 팔로워/팔로잉 목록 화면으로 이동
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowListScreen()));
-            },
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowListScreen(initialIndex: 1))),
             child: _buildStatItem("3", "팔로잉"),
           ),
           GestureDetector(
-            onTap: () {
-              // 스팟 지수 상세 정보 화면으로 이동
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SpotIndexInfoScreen()));
-            },
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SpotIndexInfoScreen())),
             child: _buildStatItem("850", "스팟 지수"),
           ),
         ],
@@ -177,7 +158,6 @@ class MyPageScreen extends StatelessWidget {
     );
   }
 
-  // 게시물 그리드
   Widget _buildPostGrid({bool isEmpty = false}) {
     if (isEmpty) {
       return const Center(child: Text('아직 작성한 글이 없습니다.', style: TextStyle(color: Colors.grey)));
@@ -189,7 +169,7 @@ class MyPageScreen extends StatelessWidget {
         crossAxisSpacing: 4,
         mainAxisSpacing: 4,
       ),
-      itemCount: 1, // 예시 아이템 개수
+      itemCount: 1,
       itemBuilder: (context, index) {
         return Container(
           color: Colors.grey.shade300,

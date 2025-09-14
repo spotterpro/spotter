@@ -6,15 +6,15 @@ class RewardDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Theme.of(context).brightness == Brightness.light ? Colors.grey[100] : Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.grey[100],
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('스탬프 적립 현황', style: TextStyle(color: Colors.black)),
+        title: const Text('스탬프 적립 현황'),
         centerTitle: true,
       ),
       body: Padding(
@@ -67,9 +67,9 @@ class RewardDetailScreen extends StatelessWidget {
                   child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('목표 달성까지 앞으로 ', style: TextStyle(fontSize: 16)),
+                      Text('목표 달성까지 앞으로 ', style: TextStyle(fontSize: 16, color: Colors.black)),
                       Text('1개', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blue)),
-                      Text(' 남았어요!', style: TextStyle(fontSize: 16)),
+                      Text(' 남았어요!', style: TextStyle(fontSize: 16, color: Colors.black)),
                     ],
                   ),
                 ),

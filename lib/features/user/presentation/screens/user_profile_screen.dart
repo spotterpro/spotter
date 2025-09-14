@@ -7,17 +7,14 @@ class UserProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
           '먹깨비님의 프로필',
-          style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
       ),
@@ -29,11 +26,11 @@ class UserProfileScreen extends StatelessWidget {
               SliverToBoxAdapter(child: _buildProfileHeader(context)),
               SliverPersistentHeader(
                 delegate: _StickyHeaderDelegate(
-                  const TabBar(
-                    tabs: [Tab(text: '활동 피드')],
-                    labelColor: Color(0xFFFFA726),
+                  TabBar(
+                    tabs: const [Tab(text: '활동 피드')],
+                    labelColor: Theme.of(context).colorScheme.primary,
                     unselectedLabelColor: Colors.grey,
-                    indicatorColor: Color(0xFFFFA726),
+                    indicatorColor: Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 pinned: true,
@@ -75,11 +72,11 @@ class UserProfileScreen extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         GestureDetector(
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowListScreen())),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowListScreen(initialIndex: 0))),
           child: _buildStatItem("2,300", "팔로워"),
         ),
         GestureDetector(
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowListScreen())),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FollowListScreen(initialIndex: 1))),
           child: _buildStatItem("150", "팔로잉"),
         ),
         _buildStatItem("9,800", "영향력"),
@@ -117,7 +114,6 @@ class UserProfileScreen extends StatelessWidget {
           child: OutlinedButton(
             onPressed: () {},
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.black87,
               padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               side: BorderSide(color: Colors.grey.shade300),
@@ -160,7 +156,7 @@ class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: tabBar,
     );
   }

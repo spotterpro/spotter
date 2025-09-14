@@ -7,15 +7,17 @@ class GrowthRecordScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
         automaticallyImplyLeading: false,
-        title: const Text('나의 성장 기록', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('나의 성장 기록', style: TextStyle(fontWeight: FontWeight.bold)),
+        centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.close, color: Colors.black),
+            icon: const Icon(Icons.close),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
@@ -25,22 +27,22 @@ class GrowthRecordScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildLevelGauge(),
+            _buildLevelGauge(context),
             const SizedBox(height: 32),
             _buildSectionTitle('XP 시스템이란?'),
             const SizedBox(height: 8),
             const Text(
               'XP(경험치)는 Spotter에서의 다양한 활동을 통해 얻을 수 있는 포인트입니다. XP를 모아 레벨을 올리고, 더 높은 등급의 칭호를 획득하여 당신의 영향력을 증명해보세요!',
-              style: TextStyle(color: Colors.black54, height: 1.5),
+              style: TextStyle(color: Colors.grey, height: 1.5),
             ),
             const SizedBox(height: 32),
             _buildSectionTitle('XP 획득 방법'),
             const SizedBox(height: 12),
-            _buildXpMethodGrid(),
+            _buildXpMethodGrid(context),
             const SizedBox(height: 32),
             _buildSectionTitle('레벨별 칭호'),
             const SizedBox(height: 12),
-            _buildLevelTitlesList(),
+            _buildLevelTitlesList(context),
           ],
         ),
       ),
@@ -51,7 +53,8 @@ class GrowthRecordScreen extends StatelessWidget {
     return Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold));
   }
 
-  Widget _buildLevelGauge() {
+  Widget _buildLevelGauge(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     const double currentXp = 530;
     const double totalXp = 1000;
     const double progress = currentXp / totalXp;
@@ -66,8 +69,8 @@ class GrowthRecordScreen extends StatelessWidget {
             CircularProgressIndicator(
               value: 1,
               strokeWidth: 12,
-              backgroundColor: Colors.grey[200],
-              color: Colors.orange.shade100,
+              backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+              color: isDarkMode ? Colors.orange.shade800.withOpacity(0.5) : Colors.orange.shade100,
             ),
             Transform.rotate(
               angle: -math.pi / 2,
@@ -94,7 +97,7 @@ class GrowthRecordScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildXpMethodGrid() {
+  Widget _buildXpMethodGrid(BuildContext context) {
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
@@ -103,26 +106,28 @@ class GrowthRecordScreen extends StatelessWidget {
       mainAxisSpacing: 12,
       childAspectRatio: 2.5,
       children: [
-        _buildXpMethodCard(Icons.camera_alt, '피드 인증', '+20 XP'),
-        _buildXpMethodCard(Icons.approval, '스탬프 획득', '+10 XP'),
-        _buildXpMethodCard(Icons.emoji_events, '투어 완료', '+50 XP'),
-        _buildXpMethodCard(Icons.card_giftcard, '리워드 사용', '+5 XP'),
-        _buildXpMethodCard(Icons.chat_bubble, '커뮤니티 활동', '+2 XP'),
+        _buildXpMethodCard(context, Icons.camera_alt, '피드 인증', '+20 XP'),
+        _buildXpMethodCard(context, Icons.approval, '스탬프 획득', '+10 XP'),
+        _buildXpMethodCard(context, Icons.emoji_events, '투어 완료', '+50 XP'),
+        _buildXpMethodCard(context, Icons.card_giftcard, '리워드 사용', '+5 XP'),
+        _buildXpMethodCard(context, Icons.chat_bubble, '커뮤니티 활동', '+2 XP'),
       ],
     );
   }
 
-  Widget _buildXpMethodCard(IconData icon, String title, String xp) {
+  Widget _buildXpMethodCard(BuildContext context, IconData icon, String title, String xp) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: isDarkMode ? Colors.grey[850] : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade200),
       ),
       child: Row(
         children: [
-          Icon(icon, color: Colors.black54),
+          Icon(icon, color: Colors.grey),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,32 +142,48 @@ class GrowthRecordScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLevelTitlesList() {
+  Widget _buildLevelTitlesList(BuildContext context) {
     return Column(
       children: [
-        _buildTitleMilestone('LV. 1', '새내기 스포터', true),
-        _buildTitleMilestone('LV. 10', '동네 탐험가', true),
-        _buildTitleMilestone('LV. 25', '골목대장', true),
-        _buildTitleMilestone('LV. 50', '도시 개척자', false),
-        _buildTitleMilestone('LV. 100', '스팟 마스터', false),
+        _buildTitleMilestone(context, 'LV. 1', '새내기 스포터', true),
+        _buildTitleMilestone(context, 'LV. 10', '동네 탐험가', true),
+        _buildTitleMilestone(context, 'LV. 25', '골목대장', true),
+        _buildTitleMilestone(context, 'LV. 50', '도시 개척자', false),
+        _buildTitleMilestone(context, 'LV. 100', '스팟 마스터', false),
       ],
     );
   }
 
-  Widget _buildTitleMilestone(String level, String title, bool achieved) {
+  Widget _buildTitleMilestone(BuildContext context, String level, String title, bool achieved) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    final Color cardColor = achieved
+        ? (isDarkMode ? Colors.green.shade900.withOpacity(0.6) : Colors.green.shade50)
+        : (isDarkMode ? const Color(0xFF1E1E1E) : Colors.white);
+
+    final Color borderColor = achieved
+        ? (isDarkMode ? Colors.green.shade800 : Colors.green.shade100)
+        : (isDarkMode ? Colors.grey.shade700 : Colors.grey.shade200);
+
+    final Color iconBackgroundColor = achieved
+        ? (isDarkMode ? Colors.green.shade400 : Colors.green)
+        : (isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300);
+
+    final Color iconForegroundColor = achieved ? Colors.white : (isDarkMode ? Colors.grey.shade300 : Colors.white);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: achieved ? Colors.green.shade50 : Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: achieved ? Colors.green.shade100 : Colors.grey.shade200),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
           CircleAvatar(
-            backgroundColor: achieved ? Colors.green : Colors.grey.shade300,
-            foregroundColor: Colors.white,
+            backgroundColor: iconBackgroundColor,
+            foregroundColor: iconForegroundColor,
             radius: 20,
             child: const Icon(Icons.stars),
           ),

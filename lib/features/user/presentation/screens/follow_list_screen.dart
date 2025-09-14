@@ -1,38 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:spotter/features/user/presentation/screens/user_profile_screen.dart'; // [추가]
+import 'package:spotter/features/user/presentation/screens/user_profile_screen.dart';
 
 class FollowListScreen extends StatelessWidget {
-  const FollowListScreen({super.key});
+  final int initialIndex;
+
+  const FollowListScreen({super.key, this.initialIndex = 0});
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
+      initialIndex: initialIndex,
       length: 2,
       child: Scaffold(
-        backgroundColor: Colors.white,
         appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 1,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          title: const Text('스포터', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          title: const Text('스포터', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: true,
           bottom: const TabBar(
             tabs: [
               Tab(text: '125 팔로워'),
               Tab(text: '3 팔로잉'),
             ],
-            labelColor: Colors.black,
+            indicatorColor: Colors.orange,
+            labelColor: Colors.orange,
             unselectedLabelColor: Colors.grey,
-            indicatorColor: Colors.black,
           ),
         ),
         body: TabBarView(
           children: [
-            _buildUserListView(context: context, isFollower: true), // context 전달
-            _buildUserListView(context: context, isFollower: false), // context 전달
+            _buildUserListView(context: context, isFollower: true),
+            _buildUserListView(context: context, isFollower: false),
           ],
         ),
       ),
@@ -40,13 +40,13 @@ class FollowListScreen extends StatelessWidget {
   }
 
   Widget _buildUserListView({required BuildContext context, required bool isFollower}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return ListView.builder(
       itemCount: isFollower ? 125 : 3,
       itemBuilder: (context, index) {
-        // [수정] ListTile과 InkWell을 사용하여 탭 효과와 네비게이션 기능을 추가합니다.
         return InkWell(
           onTap: () {
-            // 탭하면 유저 프로필 화면으로 이동합니다.
             Navigator.of(context).push(
               MaterialPageRoute(builder: (context) => const UserProfileScreen()),
             );
@@ -68,7 +68,14 @@ class FollowListScreen extends StatelessWidget {
                 ),
                 isFollower
                     ? OutlinedButton(onPressed: () {}, child: const Text('삭제'), style: OutlinedButton.styleFrom(foregroundColor: Colors.grey))
-                    : FilledButton(onPressed: () {}, child: const Text('팔로잉'), style: FilledButton.styleFrom(backgroundColor: Colors.grey.shade200, foregroundColor: Colors.black)),
+                    : FilledButton(
+                  onPressed: () {},
+                  child: const Text('팔로잉'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200,
+                    foregroundColor: isDarkMode ? Colors.white70 : Colors.black87,
+                  ),
+                ),
               ],
             ),
           ),

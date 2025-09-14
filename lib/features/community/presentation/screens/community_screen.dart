@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-// [수정] 파일 이동에 따른 import 경로 변경
-import 'package:spotter/features/write_post/presentation/screens/write_community_post_screen.dart';
 import 'package:spotter/features/user/presentation/screens/user_profile_screen.dart';
+import 'package:spotter/features/write_post/presentation/screens/write_community_post_screen.dart';
 
 class CommunityScreen extends StatelessWidget {
   const CommunityScreen({super.key});
@@ -9,20 +8,18 @@ class CommunityScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           '스팟 커뮤니티',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.white,
-        elevation: 1,
       ),
       body: Stack(
         children: [
           ListView(
+            padding: const EdgeInsets.only(bottom: 80),
             children: [
-              _buildFilterBar(),
+              _buildFilterBar(context),
               _buildTextPost(context),
               _buildPollPost(context),
               _buildTextPost(context),
@@ -50,7 +47,7 @@ class CommunityScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFilterBar() {
+  Widget _buildFilterBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
       child: SizedBox(
@@ -60,28 +57,33 @@ class CommunityScreen extends StatelessWidget {
           children: [
             const Icon(Icons.search, color: Colors.grey, size: 28),
             const SizedBox(width: 16),
-            _buildFilterChip("🔥 주간 인기글", isHot: true),
-            _buildFilterChip("#전체", isSelected: true),
-            _buildFilterChip("#맛집탐방"),
-            _buildFilterChip("#오운완"),
-            _buildFilterChip("#동네소식"),
+            _buildFilterChip(context, "🔥 주간 인기글", isHot: true),
+            _buildFilterChip(context, "#전체", isSelected: true),
+            _buildFilterChip(context, "#맛집탐방"),
+            _buildFilterChip(context, "#오운완"),
+            _buildFilterChip(context, "#동네소식"),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, {bool isSelected = false, bool isHot = false}) {
+  Widget _buildFilterChip(BuildContext context, String label, {bool isSelected = false, bool isHot = false}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color unselectedColor = isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200;
+    final Color selectedTextColor = isDarkMode ? Colors.black : Colors.white;
+    final Color unselectedTextColor = isDarkMode ? Colors.white70 : Colors.black87;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4.0),
       child: ChoiceChip(
         label: Text(label),
         selected: isSelected,
         onSelected: (selected) {},
-        backgroundColor: Colors.grey[200],
-        selectedColor: isHot ? Colors.deepOrange : Colors.black,
+        backgroundColor: unselectedColor,
+        selectedColor: isHot ? Colors.deepOrange : (isDarkMode ? Colors.white : Colors.black),
         labelStyle: TextStyle(
-          color: isSelected ? Colors.white : Colors.black,
+          color: isSelected ? selectedTextColor : unselectedTextColor,
           fontWeight: FontWeight.bold,
         ),
         showCheckmark: false,
@@ -96,7 +98,7 @@ class CommunityScreen extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15.0),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: Colors.grey.withOpacity(0.2)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -110,9 +112,9 @@ class CommunityScreen extends StatelessWidget {
               style: TextStyle(fontSize: 15),
             ),
             const SizedBox(height: 12),
-            _buildHashtags(['#맛집탐방', '#동성로']),
+            _buildHashtags(context, ['#맛집탐방', '#동성로']),
             const SizedBox(height: 16),
-            _buildPostActions(likes: 45, comments: 1),
+            _buildPostActions(context, likes: 45, comments: 1),
           ],
         ),
       ),
@@ -125,7 +127,7 @@ class CommunityScreen extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15.0),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(color: Colors.grey.withOpacity(0.2)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -139,28 +141,29 @@ class CommunityScreen extends StatelessWidget {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            _buildPollOption("헬스 클럽 (수성구)"),
+            _buildPollOption(context, "헬스 클럽 (수성구)"),
             const SizedBox(height: 8),
-            _buildPollOption("요가 스튜디오 (남구)"),
+            _buildPollOption(context, "요가 스튜디오 (남구)"),
             const SizedBox(height: 12),
-            _buildHashtags(['#오운완', '#운동']),
+            _buildHashtags(context, ['#오운완', '#운동']),
             const SizedBox(height: 16),
-            _buildPostActions(likes: 12, comments: 0),
+            _buildPostActions(context, likes: 12, comments: 0),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPollOption(String text) {
+  Widget _buildPollOption(BuildContext context, String text) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return OutlinedButton(
       onPressed: () {},
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(double.infinity, 50),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        side: BorderSide(color: Colors.grey.shade300),
+        side: BorderSide(color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300),
       ),
-      child: Text(text, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+      child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
     );
   }
 
@@ -173,10 +176,7 @@ class CommunityScreen extends StatelessWidget {
       },
       child: Row(
         children: [
-          const CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.grey,
-          ),
+          const CircleAvatar(radius: 22),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,7 +204,10 @@ class CommunityScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHashtags(List<String> tags) {
+  Widget _buildHashtags(BuildContext context, List<String> tags) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color chipBackgroundColor = isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100;
+
     return Wrap(
       spacing: 8.0,
       runSpacing: 4.0,
@@ -212,25 +215,26 @@ class CommunityScreen extends StatelessWidget {
           .map((tag) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: chipBackgroundColor,
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(tag, style: TextStyle(color: Colors.blueGrey.shade700, fontSize: 12)),
+        child: Text(tag, style: TextStyle(color: Colors.blueGrey.shade200, fontSize: 12)),
       ))
           .toList(),
     );
   }
 
-  Widget _buildPostActions({required int likes, required int comments}) {
+  Widget _buildPostActions(BuildContext context, {required int likes, required int comments}) {
+    final Color iconTextColor = Theme.of(context).textTheme.bodySmall?.color ?? Colors.grey;
     return Row(
       children: [
-        Icon(Icons.favorite_border, color: Colors.grey.shade600, size: 20),
+        Icon(Icons.favorite_border, color: iconTextColor, size: 20),
         const SizedBox(width: 4),
-        Text('좋아요 $likes', style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+        Text('좋아요 $likes', style: TextStyle(color: iconTextColor, fontSize: 14)),
         const SizedBox(width: 16),
-        Icon(Icons.chat_bubble_outline, color: Colors.grey.shade600, size: 20),
+        Icon(Icons.chat_bubble_outline, color: iconTextColor, size: 20),
         const SizedBox(width: 4),
-        Text(comments > 0 ? '댓글 ($comments)' : '댓글', style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+        Text(comments > 0 ? '댓글 ($comments)' : '댓글', style: TextStyle(color: iconTextColor, fontSize: 14)),
       ],
     );
   }

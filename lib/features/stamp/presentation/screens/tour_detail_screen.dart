@@ -6,15 +6,12 @@ class TourDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        backgroundColor: Colors.grey[100],
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('투어 진행 현황', style: TextStyle(color: Colors.black)),
+        title: const Text('투어 진행 현황'),
         centerTitle: true,
       ),
       body: Padding(

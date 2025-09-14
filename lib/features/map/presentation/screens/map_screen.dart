@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kakao_map_plugin/kakao_map_plugin.dart';
-import 'package:spotter/features/user/presentation/screens/user_profile_screen.dart'; // [추가]
+import 'package:spotter/features/owner/presentation/screens/store_application_screen.dart'; // [추가]
+import 'package:spotter/features/user/presentation/screens/user_profile_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -15,23 +16,19 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'Spotter',
-          style: TextStyle(
-              color: Colors.black, fontWeight: FontWeight.bold, fontSize: 22),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
         ),
-        backgroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.chat_bubble_outline, color: Colors.black54),
+            icon: const Icon(Icons.chat_bubble_outline),
             onPressed: () {},
           ),
           IconButton(
-            icon:
-            const Icon(Icons.notifications_none_outlined, color: Colors.black54),
+            icon: const Icon(Icons.notifications_none_outlined),
             onPressed: () {},
           ),
         ],
@@ -44,41 +41,41 @@ class _MapScreenState extends State<MapScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Container(
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(12.0),
-                      ),
-                      child: const TextField(
-                        decoration: InputDecoration(
-                          hintText: '   지역, 가게, #태그 검색',
-                          prefixIcon: Icon(Icons.search, color: Colors.grey),
-                          border: InputBorder.none,
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: '지역, 가게, #태그 검색',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12.0),
+                          borderSide: BorderSide.none,
                         ),
+                        filled: true,
+                        fillColor: Theme.of(context).brightness == Brightness.light ? Colors.grey[200] : Colors.grey[800],
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    height: 48,
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    height: 50,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(12.0),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: Colors.grey.withOpacity(0.5)),
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: '거리순',
-                        items: <String>['거리순', '인기순', '최신순']
-                            .map((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value),
-                          );
-                        }).toList(),
-                        onChanged: (_) {},
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: '거리순',
+                          items: <String>['거리순', '인기순', '최신순']
+                              .map((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          }).toList(),
+                          onChanged: (_) {},
+                        ),
                       ),
                     ),
                   ),
@@ -97,39 +94,44 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           ),
+          // [수정] 프로모션 배너에 GestureDetector를 추가하여 화면 이동 기능을 넣습니다.
           SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const StoreApplicationScreen()),
+                );
+              },
+              child: Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 color: const Color(0xFF2C3E50),
-                borderRadius: BorderRadius.circular(15.0),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.storefront, color: Colors.white, size: 32),
-                  const SizedBox(width: 16),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '선착순 100명 한정, 3개월 무료!',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.storefront, color: Colors.white, size: 32),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '선착순 100명 한정, 3개월 무료!',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              '가게를 등록하고 모든 기능을 무료로 이용해보세요.',
+                              style: TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                          ],
                         ),
-                        SizedBox(height: 4),
-                        Text(
-                          '가게를 등록하고 모든 기능을 무료로 이용해보세요.',
-                          style: TextStyle(color: Colors.white70, fontSize: 12),
-                        ),
-                      ],
-                    ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+                    ],
                   ),
-                  const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
-                ],
+                ),
               ),
             ),
           ),
@@ -144,8 +146,7 @@ class _MapScreenState extends State<MapScreen> {
                     children: [
                       const Text(
                         '🔥 지금 뜨는 스팟 추천',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       TextButton(
                         onPressed: () {},
@@ -205,14 +206,14 @@ class _MapScreenState extends State<MapScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Text(
                 '실시간 스팟 피드',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
           ),
           SliverList(
             delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                return _buildFeedItem(context); // context 전달
+                return _buildFeedItem(context);
               },
               childCount: 5,
             ),
@@ -222,17 +223,22 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildFeedItem(BuildContext context) { // context를 받도록 수정
+  Widget _buildFeedItem(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDarkMode ? Colors.grey.shade800 : Colors.grey.shade300;
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      elevation: 2.0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15.0),
+        side: BorderSide(color: borderColor),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.all(12.0),
-            // [수정] GestureDetector를 추가하여 프로필 화면으로 이동시킵니다.
             child: GestureDetector(
               onTap: () {
                 Navigator.of(context).push(
@@ -272,7 +278,7 @@ class _MapScreenState extends State<MapScreen> {
               children: ['#오오티디', '#패션', '#편집샵']
                   .map((tag) => Chip(
                 label: Text(tag, style: const TextStyle(fontSize: 12)),
-                backgroundColor: Colors.grey.shade200,
+                backgroundColor: Theme.of(context).chipTheme.backgroundColor,
                 side: BorderSide.none,
               ))
                   .toList(),

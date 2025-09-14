@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:spotter/features/store/presentation/screens/store_profile_screen.dart';
 
 class CrewStudioScreen extends StatefulWidget {
   const CrewStudioScreen({super.key});
@@ -27,59 +28,54 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: Colors.white,
         appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 1,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          title: const Text('크루 스튜디오', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          title: const Text('크루 스튜디오', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: true,
           bottom: const TabBar(
             tabs: [
               Tab(text: '대시보드'),
               Tab(text: '찜한 가게'),
             ],
-            labelColor: Colors.black,
+            indicatorColor: Colors.orange,
+            labelColor: Colors.orange,
             unselectedLabelColor: Colors.grey,
-            indicatorColor: Colors.black,
           ),
         ),
         body: TabBarView(
           children: [
-            _buildDashboardTab(),
-            _buildBookmarkedStoresTab(),
+            _buildDashboardTab(context),
+            _buildBookmarkedStoresTab(context),
           ],
         ),
       ),
     );
   }
 
-  // '대시보드' 탭 UI
-  Widget _buildDashboardTab() {
+  Widget _buildDashboardTab(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
         _buildSectionTitle('핵심 지표'),
         const SizedBox(height: 12),
-        _buildCoreMetricsGrid(),
+        _buildCoreMetricsGrid(context),
         const SizedBox(height: 24),
         _buildSectionTitle('명예의 전당'),
         const SizedBox(height: 12),
-        _buildHallOfFameSection(),
+        _buildHallOfFameSection(context),
       ],
     );
   }
 
-  // '찜한 가게' 탭 UI
-  Widget _buildBookmarkedStoresTab() {
+  Widget _buildBookmarkedStoresTab(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
-        _buildBookmarkedStoreTile('카페 스프링', '카페'),
-        _buildBookmarkedStoreTile('클린 세탁소', '서비스'),
+        _buildBookmarkedStoreTile(context, '카페 스프링', '카페'),
+        _buildBookmarkedStoreTile(context, '클린 세탁소', '서비스'),
       ],
     );
   }
@@ -88,8 +84,7 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
     return Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold));
   }
 
-  // 핵심 지표 그리드
-  Widget _buildCoreMetricsGrid() {
+  Widget _buildCoreMetricsGrid(BuildContext context) {
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
@@ -98,41 +93,44 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
       mainAxisSpacing: 12,
       childAspectRatio: 1.5,
       children: [
-        _buildMetricCard('나의 레벨', 'LV.25', Icons.arrow_upward),
-        _buildMetricCard('경험치 (XP)', '1530', Icons.flash_on),
-        _buildMetricCard('나의 칭호', '동네 탐험가', Icons.verified),
-        _buildMetricCard('총 태깅 발생', '1,284', Icons.touch_app),
+        _buildMetricCard(context, '나의 레벨', 'LV.25', Icons.arrow_upward),
+        _buildMetricCard(context, '경험치 (XP)', '1530', Icons.flash_on),
+        _buildMetricCard(context, '나의 칭호', '동네 탐험가', Icons.verified),
+        _buildMetricCard(context, '총 태깅 발생', '1,284', Icons.touch_app),
       ],
     );
   }
 
-  Widget _buildMetricCard(String title, String value, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade200),
+  Widget _buildMetricCard(BuildContext context, String title, String value, IconData icon) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15.0),
+        side: BorderSide(color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: Colors.grey, size: 18),
-              const SizedBox(width: 4),
-              Text(title, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-            ],
-          ),
-          Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: Colors.grey, size: 18),
+                const SizedBox(width: 4),
+                Text(title, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+              ],
+            ),
+            Text(value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          ],
+        ),
       ),
     );
   }
 
-  // 명예의 전당 섹션 (중첩된 TabBar 포함)
-  Widget _buildHallOfFameSection() {
+  Widget _buildHallOfFameSection(BuildContext context) {
     return Column(
       children: [
         TabBar(
@@ -141,17 +139,17 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
             Tab(text: '이달의 스탬프왕'),
             Tab(text: '인기 가게'),
           ],
+          indicatorColor: Colors.orange,
           labelColor: Colors.orange,
           unselectedLabelColor: Colors.grey,
-          indicatorColor: Colors.orange,
         ),
         SizedBox(
-          height: 350, // 랭킹 목록의 높이를 고정
+          height: 350,
           child: TabBarView(
             controller: _hallOfFameTabController,
             children: [
-              _buildUserRankingList(),
-              _buildStoreRankingList(),
+              _buildUserRankingList(context),
+              _buildStoreRankingList(context),
             ],
           ),
         ),
@@ -159,31 +157,33 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
     );
   }
 
-  // 유저 랭킹 목록
-  Widget _buildUserRankingList() {
+  Widget _buildUserRankingList(BuildContext context) {
     return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(top: 8),
       children: [
-        _buildRankingTile(1, '스포터', '스탬프 123개'),
-        _buildRankingTile(2, '먹깨비', '스탬프 123개'),
-        _buildRankingTile(3, '헬창', '스탬프 123개'),
+        _buildRankingTile(context, 1, '스포터', '스탬프 123개', true),
+        _buildRankingTile(context, 2, '먹깨비', '스탬프 123개', true),
+        _buildRankingTile(context, 3, '헬창', '스탬프 123개', true),
       ],
     );
   }
 
-  // 가게 랭킹 목록
-  Widget _buildStoreRankingList() {
+  Widget _buildStoreRankingList(BuildContext context) {
     return ListView(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(top: 8),
       children: [
-        _buildRankingTile(1, '헬스 클럽', '여가'),
-        _buildRankingTile(2, '편집샵 ABC', '쇼핑'),
-        _buildRankingTile(3, '카페 스프링', '카페'),
-        _buildRankingTile(4, '맛집 파스타', '음식점'),
-        _buildRankingTile(5, '요가 스튜디오', '여가'),
+        _buildRankingTile(context, 1, '헬스 클럽', '여가', false),
+        _buildRankingTile(context, 2, '편집샵 ABC', '쇼핑', false),
+        _buildRankingTile(context, 3, '카페 스프링', '카페', false),
+        _buildRankingTile(context, 4, '맛집 파스타', '음식점', false),
+        _buildRankingTile(context, 5, '요가 스튜디오', '여가', false),
       ],
     );
   }
 
-  Widget _buildRankingTile(int rank, String title, String subtitle) {
+  Widget _buildRankingTile(BuildContext context, int rank, String title, String subtitle, bool isUser) {
     return ListTile(
       leading: Text('$rank', style: TextStyle(fontSize: 18, color: Colors.orange.shade700, fontWeight: FontWeight.bold)),
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -192,8 +192,7 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
     );
   }
 
-  // 찜한 가게 목록 타일
-  Widget _buildBookmarkedStoreTile(String name, String category) {
+  Widget _buildBookmarkedStoreTile(BuildContext context, String name, String category) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -202,7 +201,11 @@ class _CrewStudioScreenState extends State<CrewStudioScreen> with TickerProvider
         title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(category, style: const TextStyle(color: Colors.grey)),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: () { /* TODO: 가게 상세 페이지로 이동 */ },
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => const StoreProfileScreen()),
+          );
+        },
       ),
     );
   }
