@@ -45,13 +45,11 @@ class _MainScreenState extends State<MainScreen> {
             activeIcon: Icon(Icons.groups),
             label: '커뮤니티',
           ),
-          // [수정] 스탬프 아이콘을 도장(인증) 모양으로 변경했습니다.
           BottomNavigationBarItem(
             icon: Icon(Icons.approval_outlined),
             activeIcon: Icon(Icons.approval),
             label: '스탬프',
           ),
-          // [수정] 글쓰기 아이콘을 '+' 모양으로, 라벨을 '피드작성'으로 변경했습니다.
           BottomNavigationBarItem(
             icon: Icon(Icons.add_circle_outline),
             activeIcon: Icon(Icons.add_circle),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:kakao_map_plugin/kakao_map_plugin.dart';
+import 'package:spotter/features/user/presentation/screens/user_profile_screen.dart'; // [추가]
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -37,7 +38,6 @@ class _MapScreenState extends State<MapScreen> {
       ),
       body: CustomScrollView(
         slivers: [
-          // 검색 및 필터 영역
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -86,8 +86,6 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           ),
-
-          // 지도 영역
           SliverToBoxAdapter(
             child: SizedBox(
               height: 250,
@@ -95,14 +93,10 @@ class _MapScreenState extends State<MapScreen> {
                 onMapCreated: (controller) {
                   mapController = controller;
                   mapController.setCenter(LatLng(35.8714354, 128.601445));
-                  // [수정] 존재하지 않는 setZoomLevel 함수 호출 코드를 삭제했습니다.
                 },
               ),
             ),
           ),
-
-          // ... 이하 프로모션 배너, 피드 등 코드는 이전과 동일합니다 ...
-          // 프로모션 배너
           SliverToBoxAdapter(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -139,7 +133,6 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           ),
-          // 지금 뜨는 스팟 추천
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
@@ -207,7 +200,6 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           ),
-          // 실시간 스팟 피드
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -220,7 +212,7 @@ class _MapScreenState extends State<MapScreen> {
           SliverList(
             delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                return _buildFeedItem();
+                return _buildFeedItem(context); // context 전달
               },
               childCount: 5,
             ),
@@ -230,7 +222,7 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
-  Widget _buildFeedItem() {
+  Widget _buildFeedItem(BuildContext context) { // context를 받도록 수정
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       elevation: 2.0,
@@ -238,23 +230,31 @@ class _MapScreenState extends State<MapScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(12.0),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.grey,
-                ),
-                SizedBox(width: 12.0),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('스포터', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text('편집샵 ABC · 2025-09-12', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  ],
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            // [수정] GestureDetector를 추가하여 프로필 화면으로 이동시킵니다.
+            child: GestureDetector(
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const UserProfileScreen()),
+                );
+              },
+              child: const Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: Colors.grey,
+                  ),
+                  SizedBox(width: 12.0),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('스포터', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text('편집샵 ABC · 2025-09-12', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           Container(
