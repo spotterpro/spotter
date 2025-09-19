@@ -1,0 +1,37 @@
+name: spotter_admin
+description: A new Flutter project for Spotter admin.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.3 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase (코어, 인증, DB, 함수 호출)
+  firebase_core: ^3.1.1
+  firebase_auth: ^5.1.1
+  cloud_firestore: ^5.0.2
+  cloud_functions: ^5.0.1
+
+  # Kakao Map (지도 UI 표시용)
+  kakao_map_plugin: ^0.3.7
+  kakao_flutter_sdk_common: ^1.9.1+2
+
+  # Kakao Map 웹 실행을 위한 필수 엔진
+  webview_flutter_web: ^0.2.3+4
+  webview_flutter_platform_interface: ^2.14.0
+
+  cupertino_icons: ^1.0.8
+  http: ^1.5.0
+  image_picker: ^1.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

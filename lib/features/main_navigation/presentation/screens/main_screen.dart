@@ -1,3 +1,5 @@
+// features/main_navigation/presentation/screens/main_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:spotter/features/community/presentation/screens/community_screen.dart';
 import 'package:spotter/features/map/presentation/screens/map_screen.dart';
@@ -32,7 +34,36 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _widgetOptions.elementAt(_selectedIndex),
+      appBar: _selectedIndex == 0
+          ? AppBar(
+        title: const Text('Spotter', style: TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 1,
+        centerTitle: false,
+        actions: [
+          // [추가] 누락되었던 메시지 버튼을 복원했습니다.
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline),
+            onPressed: () {
+              // TODO: 채팅 화면으로 이동하는 로직 구현
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_none_outlined),
+            onPressed: () {
+              // TODO: 알림 화면으로 이동하는 로직 구현
+            },
+          ),
+        ],
+      )
+          : null,
+      body: SafeArea(
+        // 홈 탭이 아닐 때 상단 시스템 UI 침범 방지
+        top: _selectedIndex != 0,
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: _widgetOptions,
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
@@ -64,7 +95,7 @@ class _MainScreenState extends State<MainScreen> {
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
-        // 테마에서 색상 등을 관리하므로 개별 속성 지정 최소화
+        showUnselectedLabels: true,
       ),
     );
   }

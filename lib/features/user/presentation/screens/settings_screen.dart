@@ -1,12 +1,18 @@
+// SettingsScreen.dart - '라우터' 연결 최종본
+
 import 'package:flutter/material.dart';
 import 'package:spotter/features/authentication/data/services/auth_service.dart';
 import 'package:spotter/features/authentication/presentation/screens/login_screen.dart';
-import 'package:spotter/features/owner/presentation/screens/store_application_screen.dart';
+// [수정] 우리가 만든 '중앙 관제소(라우터)'를 import 합니다.
+import 'package:spotter/features/owner/presentation/screens/owner_mode_router_screen.dart';
 import 'package:spotter/features/policy/presentation/screens/policies_screen.dart';
 import 'package:spotter/features/theme/data/theme_provider.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
+
+  // [제거] 더 이상 필요 없는 중복 로직 함수를 완전히 삭제합니다.
+  // Future<DocumentSnapshot?> _getStoreApplication() async { ... }
 
   @override
   Widget build(BuildContext context) {
@@ -40,11 +46,10 @@ class SettingsScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 _buildMenuTile(
                   title: '가게 전환',
+                  // [수정] 복잡한 로직을 모두 제거하고 '라우터'를 호출하는 한 줄로 변경
                   onTap: () {
-                    // 가게 심사 신청 화면으로 이동
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => const StoreApplicationScreen()),
-                    );
+                    Navigator.of(context).push(MaterialPageRoute(
+                        builder: (context) => const OwnerModeRouterScreen()));
                   },
                 ),
                 const SizedBox(height: 16),
@@ -61,7 +66,7 @@ class SettingsScreen extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.only(bottom: 20.0),
             child: Text(
-              'Spotter v1.2.0',
+              'Spotter v1.0.0', // 버전 정보는 필요에 따라 수정하시면 됩니다.
               style: TextStyle(color: Colors.grey),
             ),
           ),
@@ -69,6 +74,8 @@ class SettingsScreen extends StatelessWidget {
       ),
     );
   }
+
+  // --- 이하 UI 빌드 메서드들은 기존 코드와 동일합니다 ---
 
   Widget _buildDarkModeTile(BuildContext context, bool isDarkMode) {
     return ListTile(
@@ -135,8 +142,8 @@ class SettingsScreen extends StatelessWidget {
           _buildInfoRow('사업자명', '스포터 (Spotter)'),
           _buildInfoRow('대표', '형님'),
           _buildInfoRow('사업자등록번호', '000-00-00000'),
-          _buildInfoRow('주소', '대구광역시 중구 국채보상로 123'),
-          _buildInfoRow('통신판매업신고번호', '제2025-대구중구-0913호'),
+          _buildInfoRow('주소', '대구광역시 동구 동대구로 590'),
+          _buildInfoRow('통신판매업신고번호', '제2025-대구동구-0918호'),
         ],
       ),
     );
